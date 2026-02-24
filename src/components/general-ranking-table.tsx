@@ -20,7 +20,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GeneralRankingPlayer, SortConfig } from "@/types/ranking";
-import { formatT1 } from "@/lib/ranking-logic";
 
 function SortIcon({ column, sortConfig }: { column: string; sortConfig: SortConfig }) {
   if (sortConfig.key !== column) return <ChevronsUpDown className="h-4 w-4 ml-1 opacity-50" />;
@@ -154,7 +153,6 @@ export function GeneralRankingTable() {
                 <SortableHead column="total_points">Punti Totali</SortableHead>
                 <SortableHead column="t1">T1</SortableHead>
                 <SortableHead column="presenze">Presenze</SortableHead>
-                <SortableHead column="stages_played">Tappe</SortableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -177,9 +175,6 @@ export function GeneralRankingTable() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{player.presenze}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{player.stages_played}</Badge>
                   </TableCell>
                 </TableRow>
               ))}

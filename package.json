@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3080",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3080",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -14,7 +14,9 @@
     "db:studio": "drizzle-kit studio",
     "db:drop": "drizzle-kit drop",
     "db:seed": "tsx scripts/seed.ts",
-    "db:create-user": "tsx scripts/create-user.ts"
+    "db:mock": "tsx scripts/mock-data.ts",
+    "db:create-user": "tsx scripts/create-user.ts",
+    "db:create-db-user": "tsx scripts/create-db-user.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

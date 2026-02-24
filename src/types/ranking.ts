@@ -5,7 +5,6 @@ export interface GeneralRankingPlayer {
   total_points: number;
   t1: number;
   presenze: number;
-  stages_played: number;
   best_results: string | null;
   created_at: string;
   updated_at: string;

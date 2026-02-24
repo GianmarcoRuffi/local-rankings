@@ -192,9 +192,9 @@ export function normalizeName(name: string): string {
  * Trova o crea un giocatore nel ranking generale basandosi sul nome normalizzato
  */
 export function findOrCreatePlayer(
-  generalRanking: Array<{ name: string; total_points: number; t1: number; stages_played: number }>,
+  generalRanking: Array<{ name: string; total_points: number; t1: number; presenze: number }>,
   playerName: string
-): { name: string; total_points: number; t1: number; stages_played: number; isNew: boolean } {
+): { name: string; total_points: number; t1: number; presenze: number; isNew: boolean } {
   const normalizedName = normalizeName(playerName);
   const existing = generalRanking.find(
     (p) => normalizeName(p.name) === normalizedName
@@ -208,7 +208,7 @@ export function findOrCreatePlayer(
     name: capitalizeName(playerName),
     total_points: 0,
     t1: 0,
-    stages_played: 0,
+    presenze: 0,
     isNew: true,
   };
 }

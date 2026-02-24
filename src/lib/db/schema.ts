@@ -77,7 +77,6 @@ export const generalRanking = mysqlTable(
     totalPoints: int("total_points").notNull().default(0),
     t1: int().default(0),
     presenze: int().notNull().default(0),
-    stagesPlayed: int("stages_played").notNull().default(0),
     bestResults: text("best_results"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

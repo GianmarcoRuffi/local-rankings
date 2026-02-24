@@ -51,19 +51,19 @@ export async function POST(request: Request) {
     try {
       for (const player of stagePlayers) {
         const [existing] = await connection.execute<RowDataPacket[]>(
-          "SELECT id, total_points, t1, stages_played, presenze FROM general_ranking WHERE LOWER(name) = LOWER(?)",
+          "SELECT id, total_points, t1, presenze FROM general_ranking WHERE LOWER(name) = LOWER(?)",
           [player.name]
         );
 
         if (existing.length > 0) {
           const current = existing[0];
           await connection.execute(
-            "UPDATE general_ranking SET total_points = total_points + ?, t1 = t1 + ?, stages_played = stages_played + 1, presenze = presenze + ?, updated_at = NOW() WHERE id = ?",
+            "UPDATE general_ranking SET total_points = total_points + ?, t1 = t1 + ?, presenze = presenze + ?, updated_at = NOW() WHERE id = ?",
             [player.points_awarded, player.t1 || 0, player.presenze || 1, current.id]
           );
         } else {
           await connection.execute<ResultSetHeader>(
-            "INSERT INTO general_ranking (name, total_points, t1, stages_played, presenze, created_at, updated_at) VALUES (?, ?, ?, 1, ?, NOW(), NOW())",
+            "INSERT INTO general_ranking (name, total_points, t1, presenze, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
             [player.name, player.points_awarded, player.t1 || 0, player.presenze || 1]
           );
         }

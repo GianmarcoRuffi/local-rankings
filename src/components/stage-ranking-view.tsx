@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   ChevronUp,
   ChevronDown,
@@ -38,7 +40,6 @@ import {
 } from "@/components/ui/dialog";
 import { Stage, StageRankingPlayer, SortConfig } from "@/types/ranking";
 import { toast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
 
 function SortIcon({ column, sortConfig }: { column: string; sortConfig: SortConfig }) {
   if (sortConfig.key !== column)
@@ -103,6 +104,8 @@ interface EditState {
 
 export function StageRankingView() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAuthenticated = !!session;
   const [stages, setStages] = useState<Stage[]>([]);
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [players, setPlayers] = useState<StageRankingPlayer[]>([]);
@@ -368,17 +371,19 @@ export function StageRankingView() {
                     {stage.name}
                     <StatusBadge status={stage.status} />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => {
-                      setStageToDelete(stage);
-                      setDeleteDialogOpen(true);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isAuthenticated && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        setStageToDelete(stage);
+                        setDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -402,28 +407,30 @@ export function StageRankingView() {
                 </p>
               )}
             </div>
-            <div className="flex gap-2">
-              {currentSelectedStage.status === "merged" ? (
-                <Button
-                  variant="outline"
-                  onClick={handleRevertMerge}
-                  disabled={reverting}
-                  className="gap-2"
-                >
-                  <Undo2 className="h-4 w-4" />
-                  {reverting ? "Annullamento..." : "Annulla inserimento"}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleMerge}
-                  disabled={merging || players.length === 0}
-                  className="gap-2"
-                >
-                  <Merge className="h-4 w-4" />
-                  {merging ? "Unione in corso..." : "Inserisci nella classifica generale"}
-                </Button>
-              )}
-            </div>
+            {isAuthenticated && (
+              <div className="flex gap-2">
+                {currentSelectedStage.status === "merged" ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleRevertMerge}
+                    disabled={reverting}
+                    className="gap-2"
+                  >
+                    <Undo2 className="h-4 w-4" />
+                    {reverting ? "Annullamento..." : "Annulla inserimento"}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleMerge}
+                    disabled={merging || players.length === 0}
+                    className="gap-2"
+                  >
+                    <Merge className="h-4 w-4" />
+                    {merging ? "Unione in corso..." : "Inserisci nella classifica generale"}
+                  </Button>
+                )}
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {loadingPlayers ? (
@@ -446,7 +453,7 @@ export function StageRankingView() {
                     <SortableHead column="points_awarded">Punti Classifica</SortableHead>
                     <SortableHead column="t1">T1</SortableHead>
                     <SortableHead column="presenze">Presenze</SortableHead>
-                    <TableHead className="w-24">Azioni</TableHead>
+                    {isAuthenticated && <TableHead className="w-24">Azioni</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -455,7 +462,7 @@ export function StageRankingView() {
                       <TableCell className="font-medium">
                         {player.position}°
                       </TableCell>
-                      {editingId === player.id ? (
+                      {isAuthenticated && editingId === player.id ? (
                         <>
                           <TableCell>
                             <Input
@@ -515,11 +522,13 @@ export function StageRankingView() {
                           <TableCell>
                             <Badge variant="outline">{player.presenze}</Badge>
                           </TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => startEdit(player)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
+                          {isAuthenticated && (
+                            <TableCell>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => startEdit(player)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          )}
                         </>
                       )}
                     </TableRow>

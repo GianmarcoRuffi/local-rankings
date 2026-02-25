@@ -32,25 +32,48 @@ export function getPointsForPosition(position: number): number {
 
 export function parsePdfText(text: string): ParsedPlayer[] {
   const lines = text
-    .split("\n")
+    .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
   const players: ParsedPlayer[] = [];
 
-  const positionRegex =
-    /^(\d+)[°\.\):\s]+([A-Za-zÀ-ÿ\s'-]+?)(?:\s+([\d.,]+))?\s*$/;
+  // Pattern per estrarre: posizione nome VP T1 T2 T3
+  // Esempio: "1 materazzo, ivan 4 +6 +5 0"
+  const dataRegex =
+    /^(\d+)\s+(.+?)\s+(\d+)\s+([\+\-]?\d+)\s+([\+\-]?\d+)\s+([\+\-]?\d+)\s*$/;
+
+  // Skip headers e altre info non rilevanti
+  const skipPatterns = [
+    /^Classifiche/i,
+    /^Turno/i,
+    /^Giocatore/i,
+    /^pagina/i,
+    /^VP\s+T1\s+T2/i,
+  ];
 
   for (const line of lines) {
-    const match = line.match(positionRegex);
+    // Salta le righe header
+    if (skipPatterns.some((pattern) => pattern.test(line))) {
+      continue;
+    }
+
+    const match = line.match(dataRegex);
     if (match) {
       const position = parseInt(match[1], 10);
       const name = match[2].trim();
-      const scoreStr = match[3]?.replace(",", ".");
-      const score = scoreStr ? parseFloat(scoreStr) : null;
+      const vp = parseInt(match[3], 10);
+      const t1Str = match[4];
+      const t1 = parseInt(t1Str.replace('+', ''), 10);
 
-      if (position >= 1 && name.length > 0) {
-        players.push({ position, name, score, t1: 0, rawLine: line });
+      if (position >= 1 && name.length > 0 && !isNaN(vp)) {
+        players.push({
+          position,
+          name,
+          score: vp,
+          t1: isNaN(t1) ? 0 : t1,
+          rawLine: line,
+        });
       }
     }
   }
@@ -58,15 +81,13 @@ export function parsePdfText(text: string): ParsedPlayer[] {
   return players.sort((a, b) => a.position - b.position);
 }
 
-export function parsePdfTableData(
-  tableRows: string[][]
-): ParsedTablePlayer[] {
+export function parsePdfTableData(tableRows: string[][]): ParsedTablePlayer[] {
   const players: ParsedTablePlayer[] = [];
 
   for (const row of tableRows) {
     if (row.length < 4) continue;
 
-    const [col0, col1, col2, col3] = row.map((c) => (c ?? "").trim());
+    const [col0, col1, col2, col3] = row.map((c) => (c ?? '').trim());
 
     const position = parseInt(col0, 10);
     if (isNaN(position) || position < 1) continue;
@@ -74,13 +95,14 @@ export function parsePdfTableData(
     const name = col1;
     if (!name || name.length === 0) continue;
 
-    const scoreStr = col2.replace(",", ".");
-    const score = scoreStr !== "" && !isNaN(parseFloat(scoreStr))
-      ? parseFloat(scoreStr)
-      : null;
+    const scoreStr = col2.replace(',', '.');
+    const score =
+      scoreStr !== '' && !isNaN(parseFloat(scoreStr))
+        ? parseFloat(scoreStr)
+        : null;
 
-    const t1Str = col3.replace(/\s/g, "");
-    const t1 = t1Str !== "" ? parseInt(t1Str, 10) : 0;
+    const t1Str = col3.replace(/\s/g, '');
+    const t1 = t1Str !== '' ? parseInt(t1Str, 10) : 0;
 
     players.push({ position, name, score, t1: isNaN(t1) ? 0 : t1 });
   }
@@ -103,12 +125,12 @@ export interface MergeResult {
 
 export function calculateMerge(
   generalRanking: Array<{ name: string; total_points: number; t1: number }>,
-  stagePlayers: Array<{ name: string; points_awarded: number; t1: number }>
+  stagePlayers: Array<{ name: string; points_awarded: number; t1: number }>,
 ): MergeResult {
   const generalMap = new Map(
-    generalRanking.map((p) => [p.name.toLowerCase(), p])
+    generalRanking.map((p) => [p.name.toLowerCase(), p]),
   );
-  const updatedPlayers: MergeResult["updatedPlayers"] = [];
+  const updatedPlayers: MergeResult['updatedPlayers'] = [];
 
   for (const stagePlayer of stagePlayers) {
     const key = stagePlayer.name.toLowerCase();
@@ -135,11 +157,11 @@ export function calculateMerge(
 
 /**
  * Comparatore personalizzato per ordinare i valori T1
- * Logica: 
+ * Logica:
  * - I valori positivi vengono prima (ordinati per valore assoluto decrescente)
  * - Lo zero va nel mezzo
  * - I valori negativi vengono dopo (ordinati per valore crescente: -2 prima di -11)
- * 
+ *
  * Esempio di ordinamento: +14, +8, +5, +4, 0, -2, -11
  */
 export function t1Comparator(a: number, b: number): number {
@@ -176,7 +198,7 @@ export function t1Comparator(a: number, b: number): number {
  * Ordina la classifica per punti totali (decrescente) e poi per T1 con comparatore personalizzato
  */
 export function sortRanking<T extends { total_points: number; t1: number }>(
-  players: T[]
+  players: T[],
 ): T[] {
   return [...players].sort((a, b) => {
     // Prima ordina per punti totali decrescenti
@@ -191,9 +213,9 @@ export function sortRanking<T extends { total_points: number; t1: number }>(
 /**
  * Rinumera le posizioni della classifica
  */
-export function recalculatePositions<T extends { total_points: number; t1: number }>(
-  players: T[]
-): Array<T & { position: number }> {
+export function recalculatePositions<
+  T extends { total_points: number; t1: number },
+>(players: T[]): Array<T & { position: number }> {
   const sorted = sortRanking(players);
   return sorted.map((player, index) => ({
     ...player,
@@ -203,17 +225,44 @@ export function recalculatePositions<T extends { total_points: number; t1: numbe
 
 /**
  * Capitalizza la prima lettera del nome/cognome
+ * Gestisce il formato "cognome, nome" e nomi composti
  */
 export function capitalizeName(name: string): string {
   if (!name || name.length === 0) return name;
-  return name.charAt(0).toUpperCase() + name.slice(1);
+
+  // Split su virgola se presente (formato "cognome, nome")
+  const parts = name.split(',').map((part) => part.trim());
+
+  // Capitalizza ogni parte
+  const capitalizedParts = parts.map((part) => {
+    // Split su spazi per gestire nomi composti
+    return part
+      .split(/\s+/)
+      .map((word) => {
+        if (word.length === 0) return word;
+        // Preserva parentesi e altri caratteri speciali
+        if (word.includes('(')) {
+          return word
+            .split('(')
+            .map((w) => {
+              if (w.length === 0) return w;
+              return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+            })
+            .join('(');
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  });
+
+  return capitalizedParts.join(', ');
 }
 
 /**
  * Formatta il valore T1 con segno positivo se necessario
  */
 export function formatT1(value: number | null | undefined): string {
-  if (value === null || value === undefined || value === 0) return "0";
+  if (value === null || value === undefined || value === 0) return '0';
   if (value > 0) return `+${value}`;
   return String(value);
 }
@@ -222,7 +271,7 @@ export function formatT1(value: number | null | undefined): string {
  * Ordina i giocatori alfabeticamente per nome
  */
 export function sortByName<T extends { name: string }>(players: T[]): T[] {
-  return [...players].sort((a, b) => a.name.localeCompare(b.name, "it"));
+  return [...players].sort((a, b) => a.name.localeCompare(b.name, 'it'));
 }
 
 /**
@@ -236,12 +285,23 @@ export function normalizeName(name: string): string {
  * Trova o crea un giocatore nel ranking generale basandosi sul nome normalizzato
  */
 export function findOrCreatePlayer(
-  generalRanking: Array<{ name: string; total_points: number; t1: number; presenze: number }>,
-  playerName: string
-): { name: string; total_points: number; t1: number; presenze: number; isNew: boolean } {
+  generalRanking: Array<{
+    name: string;
+    total_points: number;
+    t1: number;
+    presenze: number;
+  }>,
+  playerName: string,
+): {
+  name: string;
+  total_points: number;
+  t1: number;
+  presenze: number;
+  isNew: boolean;
+} {
   const normalizedName = normalizeName(playerName);
   const existing = generalRanking.find(
-    (p) => normalizeName(p.name) === normalizedName
+    (p) => normalizeName(p.name) === normalizedName,
   );
 
   if (existing) {

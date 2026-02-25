@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
-import { Trophy, BarChart3, Upload, LogOut, User } from "lucide-react";
+import { signIn, signOut } from "next-auth/react";
+import { Trophy, BarChart3, Upload, LogOut, User, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +11,10 @@ interface NavbarProps {
   user: {
     name?: string | null;
     email?: string | null;
-  };
+  } | null;
 }
 
-const navItems = [
+const publicNavItems = [
   {
     href: "/dashboard",
     label: "Classifica Generale",
@@ -25,6 +25,9 @@ const navItems = [
     label: "Visualizza tappe",
     icon: Trophy,
   },
+];
+
+const privateNavItems = [
   {
     href: "/dashboard/upload",
     label: "Aggiungi tappe",
@@ -34,6 +37,7 @@ const navItems = [
 
 export function Navbar({ user }: NavbarProps) {
   const pathname = usePathname();
+  const navItems = user ? [...publicNavItems, ...privateNavItems] : publicNavItems;
 
   return (
     <nav className="border-b bg-card shadow-sm">
@@ -67,19 +71,33 @@ export function Navbar({ user }: NavbarProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-              <User className="h-4 w-4" />
-              <span>{user.name || user.email}</span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Esci</span>
-            </Button>
+            {user ? (
+              <>
+                <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  <span>{user.name || user.email}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Esci</span>
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => signIn(undefined, { callbackUrl: "/dashboard" })}
+                className="gap-2"
+              >
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">Accedi</span>
+              </Button>
+            )}
           </div>
         </div>
         <div className="md:hidden flex gap-1 pb-2 overflow-x-auto">

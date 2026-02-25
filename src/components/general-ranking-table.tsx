@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import {
   ChevronUp,
   ChevronDown,
@@ -86,6 +87,8 @@ interface EditState {
 }
 
 export function GeneralRankingTable() {
+  const { data: session } = useSession();
+  const isAuthenticated = !!session;
   const [players, setPlayers] = useState<GeneralRankingPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -261,30 +264,32 @@ export function GeneralRankingTable() {
             Classifica Generale
             <Badge variant="secondary">{players.length} giocatori</Badge>
           </CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fetchPlayers} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Aggiorna
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportToExcel}
-              disabled={loading || players.length === 0}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Esporta Excel
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setResetDialogOpen(true)}
-              disabled={loading || players.length === 0}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Reset classifica
-            </Button>
-          </div>
+          {isAuthenticated && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={fetchPlayers} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                Aggiorna
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToExcel}
+                disabled={loading || players.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Esporta Excel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setResetDialogOpen(true)}
+                disabled={loading || players.length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Reset classifica
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -309,7 +314,7 @@ export function GeneralRankingTable() {
                   <SortableHead column="total_points">Punti Totali</SortableHead>
                   <SortableHead column="t1">T1</SortableHead>
                   <SortableHead column="presenze">Presenze</SortableHead>
-                  <TableHead className="w-24">Azioni</TableHead>
+                  {isAuthenticated && <TableHead className="w-24">Azioni</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -321,7 +326,7 @@ export function GeneralRankingTable() {
                     <TableCell>
                       <PositionBadge position={player.position} />
                     </TableCell>
-                    {editingId === player.id ? (
+                    {isAuthenticated && editingId === player.id ? (
                       <>
                         <TableCell>
                           <Input
@@ -379,11 +384,13 @@ export function GeneralRankingTable() {
                         <TableCell>
                           <Badge variant="outline">{player.presenze}</Badge>
                         </TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => startEdit(player)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+                        {isAuthenticated && (
+                          <TableCell>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => startEdit(player)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </>
                     )}
                   </TableRow>

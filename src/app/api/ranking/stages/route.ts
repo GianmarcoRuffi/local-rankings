@@ -5,11 +5,6 @@ import pool from "@/lib/db";
 import { RowDataPacket } from "mysql2";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const [rows] = await pool.execute<RowDataPacket[]>(
       "SELECT * FROM stages ORDER BY created_at DESC"

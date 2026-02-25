@@ -29,3 +29,44 @@ export async function GET(
     );
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  try {
+    const [stageRows] = await pool.execute<RowDataPacket[]>(
+      "SELECT * FROM stages WHERE id = ?",
+      [id]
+    );
+
+    if (stageRows.length === 0) {
+      return NextResponse.json({ error: "Stage not found" }, { status: 404 });
+    }
+
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    try {
+      await connection.execute("DELETE FROM stage_ranking WHERE stage_id = ?", [id]);
+      await connection.execute("DELETE FROM stages WHERE id = ?", [id]);
+      await connection.commit();
+      connection.release();
+    } catch (err) {
+      await connection.rollback();
+      connection.release();
+      throw err;
+    }
+
+    return NextResponse.json({ success: true, message: "Tappa eliminata" });
+  } catch (error) {
+    console.error("Error deleting stage:", error);
+    return NextResponse.json({ error: "Failed to delete stage" }, { status: 500 });
+  }
+}

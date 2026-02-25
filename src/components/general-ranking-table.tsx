@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { GeneralRankingPlayer, SortConfig } from "@/types/ranking";
 import { toast } from "@/hooks/use-toast";
+import { t1Comparator } from "@/lib/ranking-logic";
 import * as XLSX from "xlsx";
 
 function SortIcon({ column, sortConfig }: { column: string; sortConfig: SortConfig }) {
@@ -179,15 +180,37 @@ export function GeneralRankingTable() {
   };
 
   const sortedPlayers = [...players].sort((a, b) => {
-    const aVal = a[sortConfig.key as keyof GeneralRankingPlayer];
-    const bVal = b[sortConfig.key as keyof GeneralRankingPlayer];
+    const key = sortConfig.key as keyof GeneralRankingPlayer;
+    const direction = sortConfig.direction;
+
+    // Per posizione e punti: ordina prima per punti, poi per T1
+    if (key === "position" || key === "total_points") {
+      if (a.total_points !== b.total_points) {
+        return direction === "asc"
+          ? a.total_points - b.total_points
+          : b.total_points - a.total_points;
+      }
+      // A parità di punti, usa il comparatore T1
+      const t1Compare = t1Comparator(a.t1, b.t1);
+      return direction === "asc" ? -t1Compare : t1Compare;
+    }
+
+    // Per T1: usa il comparatore personalizzato
+    if (key === "t1") {
+      const t1Compare = t1Comparator(a.t1, b.t1);
+      return direction === "asc" ? -t1Compare : t1Compare;
+    }
+
+    // Per altre colonne (nome, presenze): ordinamento standard
+    const aVal = a[key];
+    const bVal = b[key];
     if (aVal === null || aVal === undefined) return 1;
     if (bVal === null || bVal === undefined) return -1;
     if (typeof aVal === "number" && typeof bVal === "number") {
-      return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+      return direction === "asc" ? aVal - bVal : bVal - aVal;
     }
     const comparison = String(aVal).localeCompare(String(bVal), "it");
-    return sortConfig.direction === "asc" ? comparison : -comparison;
+    return direction === "asc" ? comparison : -comparison;
   });
 
   const exportToExcel = () => {

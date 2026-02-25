@@ -99,29 +99,36 @@ export function calculateMerge(
 /**
  * Comparatore personalizzato per ordinare i valori T1
  * Logica: 
- * - I valori negativi vengono prima dei positivi (in ordine decrescente)
- * - I valori positivi vengono ordinati per valore assoluto decrescente
- * - Lo zero va alla fine
+ * - I valori positivi vengono prima (ordinati per valore assoluto decrescente)
+ * - Lo zero va nel mezzo
+ * - I valori negativi vengono dopo (ordinati per valore crescente: -2 prima di -11)
+ * 
+ * Esempio di ordinamento: +14, +8, +5, +4, 0, -2, -11
  */
 export function t1Comparator(a: number, b: number): number {
   const valA = Number(a) || 0;
   const valB = Number(b) || 0;
 
-  // Se uno è zero e l'altro no, lo zero va dopo
-  if (valA === 0 && valB !== 0) return 1;
-  if (valB === 0 && valA !== 0) return -1;
+  // Se uno è zero e l'altro no, lo zero va dopo i positivi ma prima dei negativi
+  if (valA === 0 && valB !== 0) {
+    return valB > 0 ? 1 : -1; // 0 viene dopo i positivi, prima dei negativi
+  }
+  if (valB === 0 && valA !== 0) {
+    return valA > 0 ? -1 : 1; // 0 viene dopo i positivi, prima dei negativi
+  }
 
   // Se entrambi zero, sono uguali
   if (valA === 0 && valB === 0) return 0;
 
-  // Se a è negativo e b è positivo (o zero), a viene prima
-  if (valA < 0 && valB >= 0) return -1;
-  // Se a è positivo (o zero) e b è negativo, b viene prima
-  if (valA >= 0 && valB < 0) return 1;
+  // Se a è positivo e b è negativo, a viene prima
+  if (valA > 0 && valB < 0) return -1;
+  // Se a è negativo e b è positivo, b viene prima
+  if (valA < 0 && valB > 0) return 1;
 
-  // Se entrambi negativi, ordina per valore decrescente (più negativo prima)
+  // Se entrambi negativi, ordina per valore crescente (meno negativo prima)
+  // Esempio: -2 viene prima di -11 (più alto = meno negativo)
   if (valA < 0 && valB < 0) {
-    return valA - valB; // -11 viene prima di -2
+    return valB - valA; // -2 viene prima di -11
   }
 
   // Se entrambi positivi, ordina per valore assoluto decrescente

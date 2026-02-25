@@ -237,7 +237,7 @@ export function GeneralRankingTable() {
             <div className="text-center py-12 text-muted-foreground">
               <Trophy className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p className="text-lg font-medium">Nessun giocatore in classifica</p>
-              <p className="text-sm">Carica una tappa PDF per iniziare</p>
+              <p className="text-sm">Aggiungi almeno una tappa per iniziare</p>
             </div>
           ) : (
             <Table>

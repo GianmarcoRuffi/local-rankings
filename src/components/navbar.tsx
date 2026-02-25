@@ -22,12 +22,12 @@ const navItems = [
   },
   {
     href: "/dashboard/stage",
-    label: "Tappa",
+    label: "Visualizza tappe",
     icon: Trophy,
   },
   {
     href: "/dashboard/upload",
-    label: "Tappe",
+    label: "Aggiungi tappe",
     icon: Upload,
   },
 ];

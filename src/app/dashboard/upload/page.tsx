@@ -35,7 +35,7 @@ export default function UploadPage() {
           className="gap-2 rounded-b-none"
         >
           <Plus className="h-4 w-4" />
-          + Crea Tappa Manualmente
+          Crea Tappa Manualmente
         </Button>
       </div>
 

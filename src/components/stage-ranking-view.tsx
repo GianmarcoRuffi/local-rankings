@@ -53,14 +53,14 @@ function StatusBadge({ status }: { status: Stage["status"] }) {
     return (
       <Badge variant="success" className="gap-1">
         <CheckCircle className="h-3 w-3" />
-        Unita
+        Inserita
       </Badge>
     );
   if (status === "active")
     return (
       <Badge variant="warning" className="gap-1">
         <Clock className="h-3 w-3" />
-        Attiva
+        Da inserire
       </Badge>
     );
   return (
@@ -340,7 +340,7 @@ export function StageRankingView() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Flag className="h-5 w-5 text-primary" />
-            Tappe disponibili
+            Tappe giocate
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -411,7 +411,7 @@ export function StageRankingView() {
                   className="gap-2"
                 >
                   <Undo2 className="h-4 w-4" />
-                  {reverting ? "Annullamento..." : "Annulla merge"}
+                  {reverting ? "Annullamento..." : "Annulla inserimento"}
                 </Button>
               ) : (
                 <Button
@@ -420,7 +420,7 @@ export function StageRankingView() {
                   className="gap-2"
                 >
                   <Merge className="h-4 w-4" />
-                  {merging ? "Unione in corso..." : "Unisci alla classifica generale"}
+                  {merging ? "Unione in corso..." : "Inserisci nella classifica generale"}
                 </Button>
               )}
             </div>

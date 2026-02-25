@@ -1,29 +1,35 @@
-import bcrypt from "bcryptjs";
-import { db } from "../src/lib/db";
-import { users, stages, stageRanking, generalRanking } from "../src/lib/db/schema";
-import { eq } from "drizzle-orm";
+import 'dotenv/config';
+import bcrypt from 'bcryptjs';
+import { db } from '../src/lib/db';
+import {
+  users,
+  stages,
+  stageRanking,
+  generalRanking,
+} from '../src/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 const PLAYER_NAMES = [
-  "Mario Rossi",
-  "Luigi Bianchi",
-  "Giuseppe Verdi",
-  "Anna Neri",
-  "Marco Colombo",
-  "Laura Ferrari",
-  "Paolo Conti",
-  "Giulia Romano",
-  "Andrea Ricci",
-  "Francesca Esposito",
-  "Luca Moretti",
-  "Chiara Lombardi",
-  "Davide Barbieri",
-  "Sara Rizzo",
-  "Matteo Ferrari",
-  "Elisa Costa",
-  "Simone Fontana",
-  "Martina Santoro",
-  "Alessandro Martini",
-  "Valentina Orlando",
+  'Mario Rossi',
+  'Luigi Bianchi',
+  'Giuseppe Verdi',
+  'Anna Neri',
+  'Marco Colombo',
+  'Laura Ferrari',
+  'Paolo Conti',
+  'Giulia Romano',
+  'Andrea Ricci',
+  'Francesca Esposito',
+  'Luca Moretti',
+  'Chiara Lombardi',
+  'Davide Barbieri',
+  'Sara Rizzo',
+  'Matteo Ferrari',
+  'Elisa Costa',
+  'Simone Fontana',
+  'Martina Santoro',
+  'Alessandro Martini',
+  'Valentina Orlando',
 ];
 
 const POINTS_TABLE: Record<number, number> = {
@@ -56,22 +62,22 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 async function seed() {
-  console.log("🌱 Starting mock data seed...");
+  console.log('🌱 Starting mock data seed...');
 
-  const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   const passwordHash = await bcrypt.hash(adminPassword, 10);
 
   const existingUser = await db
     .select()
     .from(users)
-    .where(eq(users.username, "admin"))
+    .where(eq(users.username, 'admin'))
     .limit(1);
 
   if (existingUser.length === 0) {
     await db.insert(users).values({
-      username: "admin",
+      username: 'admin',
       passwordHash,
-      displayName: "Amministratore",
+      displayName: 'Amministratore',
     });
     console.log('✅ Admin user created');
   } else {
@@ -80,17 +86,17 @@ async function seed() {
 
   const existingStages = await db.select().from(stages);
   if (existingStages.length > 0) {
-    console.log("⚠️  Stages already exist. Skipping mock data.");
+    console.log('⚠️  Stages already exist. Skipping mock data.');
     console.log("   Run 'npm run db:reset' first to clear the database.");
     process.exit(0);
   }
 
-  console.log("📊 Creating mock stages...");
+  console.log('📊 Creating mock stages...');
 
   const mockStages = [
-    { name: "Tappa 1 - Milano", date: "2024-01-15" },
-    { name: "Tappa 2 - Roma", date: "2024-02-20" },
-    { name: "Tappa 3 - Napoli", date: "2024-03-10" },
+    { name: 'Tappa 1 - Milano', date: '2024-01-15' },
+    { name: 'Tappa 2 - Roma', date: '2024-02-20' },
+    { name: 'Tappa 3 - Napoli', date: '2024-03-10' },
   ];
 
   for (let i = 0; i < mockStages.length; i++) {
@@ -103,7 +109,7 @@ async function seed() {
       .values({
         name: stageData.name,
         date: new Date(stageData.date),
-        status: i < mockStages.length - 1 ? "merged" : "active",
+        status: i < mockStages.length - 1 ? 'merged' : 'active',
       })
       .$returningId();
 
@@ -115,7 +121,10 @@ async function seed() {
       const playerName = shuffledPlayers[pos - 1];
       const points = POINTS_TABLE[pos] ?? 0;
       const t1 = getRandomT1();
-      const scoreValue = Math.random() > 0.5 ? (Math.round(Math.random() * 1000) / 10).toFixed(1) : null;
+      const scoreValue =
+        Math.random() > 0.5
+          ? (Math.round(Math.random() * 1000) / 10).toFixed(1)
+          : null;
 
       await db.insert(stageRanking).values({
         stageId,
@@ -163,20 +172,20 @@ async function seed() {
     }
   }
 
-  console.log("✅ Mock data seed completed!");
-  console.log("");
-  console.log("📋 Summary:");
-  console.log("   - 3 stages created (2 merged, 1 active)");
-  console.log("   - ~30 players in stage_ranking");
-  console.log("   - ~20 players in general_ranking");
-  console.log("");
-  console.log("🔑 Login credentials:");
-  console.log("   Username: admin");
-  console.log("   Password: admin123");
+  console.log('✅ Mock data seed completed!');
+  console.log('');
+  console.log('📋 Summary:');
+  console.log('   - 3 stages created (2 merged, 1 active)');
+  console.log('   - ~30 players in stage_ranking');
+  console.log('   - ~20 players in general_ranking');
+  console.log('');
+  console.log('🔑 Login credentials:');
+  console.log('   Username: admin');
+  console.log('   Password: admin123');
   process.exit(0);
 }
 
 seed().catch((error) => {
-  console.error("❌ Seed failed:", error);
+  console.error('❌ Seed failed:', error);
   process.exit(1);
 });

@@ -11,6 +11,7 @@ import {
   Pencil,
   Check,
   X,
+  Download,
 } from "lucide-react";
 import {
   Table,
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { GeneralRankingPlayer, SortConfig } from "@/types/ranking";
 import { toast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
 
 function SortIcon({ column, sortConfig }: { column: string; sortConfig: SortConfig }) {
   if (sortConfig.key !== column) return <ChevronsUpDown className="h-4 w-4 ml-1 opacity-50" />;
@@ -188,6 +190,33 @@ export function GeneralRankingTable() {
     return sortConfig.direction === "asc" ? comparison : -comparison;
   });
 
+  const exportToExcel = () => {
+    if (sortedPlayers.length === 0) return;
+
+    const data = sortedPlayers.map((player) => ({
+      "Posizione": player.position,
+      "Giocatore": player.name,
+      "Punti Totali": player.total_points,
+      "T1": player.t1 ?? 0,
+      "Presenze": player.presenze,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Classifica Generale");
+
+    const colWidths = [
+      { wch: 10 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 8 },
+      { wch: 10 },
+    ];
+    ws["!cols"] = colWidths;
+
+    XLSX.writeFile(wb, "classifica_generale.xlsx");
+  };
+
   const SortableHead = ({ column, children }: { column: string; children: React.ReactNode }) => (
     <TableHead
       className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
@@ -213,6 +242,15 @@ export function GeneralRankingTable() {
             <Button variant="outline" size="sm" onClick={fetchPlayers} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               Aggiorna
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToExcel}
+              disabled={loading || players.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Esporta Excel
             </Button>
             <Button
               variant="destructive"

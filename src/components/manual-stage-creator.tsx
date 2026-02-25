@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2, Save, CheckCircle, AlertCircle, RefreshCw, Trophy } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Trash2, Save, CheckCircle, RefreshCw, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,14 +17,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getPointsForPosition, capitalizeName } from "@/lib/ranking-logic";
+import { capitalizeName, t1Comparator } from "@/lib/ranking-logic";
 
 interface PlayerData {
   id: string;
-  position: number;
   name: string;
-  score: string;
-  points_awarded: number;
+  wins: string;
   t1: string;
 }
 
@@ -33,24 +31,36 @@ export function ManualStageCreator() {
   const [stageName, setStageName] = useState("");
   const [stageDate, setStageDate] = useState("");
   const [players, setPlayers] = useState<PlayerData[]>([
-    { id: "1", position: 1, name: "", score: "", points_awarded: 25, t1: "0" },
-    { id: "2", position: 2, name: "", score: "", points_awarded: 18, t1: "0" },
-    { id: "3", position: 3, name: "", score: "", points_awarded: 15, t1: "0" },
+    { id: "1", name: "", wins: "", t1: "0" },
+    { id: "2", name: "", wins: "", t1: "0" },
+    { id: "3", name: "", wins: "", t1: "0" },
   ]);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ stageId: number; playersCount: number } | null>(null);
 
+  const playersWithPositions = useMemo(() => {
+    const withPoints = players.map((p) => ({
+      ...p,
+      points: Math.max(0, parseInt(p.wins) || 0) * 3,
+      t1Num: parseInt(p.t1) || 0,
+    }));
+    const sorted = [...withPoints].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      return t1Comparator(a.t1Num, b.t1Num);
+    });
+    return sorted.map((p, index) => ({
+      ...p,
+      position: index + 1,
+    }));
+  }, [players]);
+
   const addPlayer = () => {
-    const nextPosition = players.length + 1;
-    const nextPoints = getPointsForPosition(nextPosition);
     setPlayers([
       ...players,
       {
         id: Date.now().toString(),
-        position: nextPosition,
         name: "",
-        score: "",
-        points_awarded: nextPoints,
+        wins: "",
         t1: "0",
       },
     ]);
@@ -58,30 +68,16 @@ export function ManualStageCreator() {
 
   const removePlayer = (id: string) => {
     if (players.length <= 1) return;
-    const newPlayers = players.filter((p) => p.id !== id);
-    // Recalculate positions and points
-    const recalculated = newPlayers.map((p, index) => ({
-      ...p,
-      position: index + 1,
-      points_awarded: getPointsForPosition(index + 1),
-    }));
-    setPlayers(recalculated);
+    setPlayers(players.filter((p) => p.id !== id));
   };
 
-  const updatePlayer = (id: string, field: keyof PlayerData, value: string | number) => {
+  const updatePlayer = (id: string, field: keyof PlayerData, value: string) => {
+    if (field === "wins") {
+      const numValue = parseInt(value) || 0;
+      if (numValue < 0) return;
+    }
     setPlayers((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        
-        const updated = { ...p, [field]: value };
-        
-        // If position changed, recalculate points
-        if (field === "position") {
-          updated.points_awarded = getPointsForPosition(Number(value) || 1);
-        }
-        
-        return updated;
-      })
+      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
     );
   };
 
@@ -107,15 +103,15 @@ export function ManualStageCreator() {
 
     setSaving(true);
     try {
+      const playersToSave = playersWithPositions.filter((p) => p.name.trim());
       const payload = {
         name: stageName.trim(),
         date: stageDate || null,
-        players: validPlayers.map((p) => ({
+        players: playersToSave.map((p) => ({
           position: p.position,
           name: capitalizeName(p.name.trim()),
-          score: p.score ? parseFloat(p.score.replace(",", ".")) : null,
-          points_awarded: p.points_awarded,
-          t1: parseInt(p.t1) || 0,
+          points_awarded: p.points,
+          t1: p.t1Num,
           presenze: 1,
         })),
       };
@@ -151,9 +147,9 @@ export function ManualStageCreator() {
     setStageName("");
     setStageDate("");
     setPlayers([
-      { id: "1", position: 1, name: "", score: "", points_awarded: 25, t1: "0" },
-      { id: "2", position: 2, name: "", score: "", points_awarded: 18, t1: "0" },
-      { id: "3", position: 3, name: "", score: "", points_awarded: 15, t1: "0" },
+      { id: "1", name: "", wins: "", t1: "0" },
+      { id: "2", name: "", wins: "", t1: "0" },
+      { id: "3", name: "", wins: "", t1: "0" },
     ]);
     setResult(null);
   };
@@ -235,66 +231,65 @@ export function ManualStageCreator() {
                 <TableRow>
                   <TableHead className="w-16">Pos.</TableHead>
                   <TableHead>Giocatore *</TableHead>
-                  <TableHead className="w-24">Punteggio</TableHead>
-                  <TableHead className="w-24">Punti</TableHead>
+                  <TableHead className="w-28">Partite Vinte</TableHead>
+                  <TableHead className="w-28">Punti Classifica</TableHead>
                   <TableHead className="w-24">T1</TableHead>
                   <TableHead className="w-16"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {players.map((player, index) => (
-                  <TableRow key={player.id}>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={player.position}
-                        onChange={(e) => updatePlayer(player.id, "position", e.target.value)}
-                        className="h-8 w-16"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        placeholder="Nome giocatore"
-                        value={player.name}
-                        onChange={(e) => updatePlayer(player.id, "name", e.target.value)}
-                        className="h-8"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        placeholder="Es. 150.5"
-                        value={player.score}
-                        onChange={(e) => updatePlayer(player.id, "score", e.target.value)}
-                        className="h-8 w-24"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-bold">
-                        +{player.points_awarded} pt
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={player.t1}
-                        onChange={(e) => updatePlayer(player.id, "t1", e.target.value)}
-                        className="h-8 w-24"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => removePlayer(player.id)}
-                        disabled={players.length <= 1}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {players.map((player) => {
+                  const playerWithPos = playersWithPositions.find((p) => p.id === player.id);
+                  return (
+                    <TableRow key={player.id}>
+                      <TableCell className="font-medium">
+                        {playerWithPos?.position}°
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Nome giocatore"
+                          value={player.name}
+                          onChange={(e) => updatePlayer(player.id, "name", e.target.value)}
+                          className="h-8"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder="0"
+                          value={player.wins}
+                          onChange={(e) => updatePlayer(player.id, "wins", e.target.value)}
+                          className="h-8 w-28"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-bold">
+                          +{playerWithPos?.points ?? 0} pt
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={player.t1}
+                          onChange={(e) => updatePlayer(player.id, "t1", e.target.value)}
+                          className="h-8 w-24"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => removePlayer(player.id)}
+                          disabled={players.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

@@ -32,15 +32,40 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, date } = body;
+    const { name, date, players } = body;
 
     const [result] = await pool.execute(
-      "INSERT INTO stages (name, date, status) VALUES (?, ?, 'pending')",
+      "INSERT INTO stages (name, date, status) VALUES (?, ?, 'active')",
       [name, date || null]
     );
 
     const insertResult = result as { insertId: number };
-    return NextResponse.json({ id: insertResult.insertId, name, date });
+    const stageId = insertResult.insertId;
+
+    // If players are provided, insert them
+    if (players && Array.isArray(players) && players.length > 0) {
+      for (const player of players) {
+        await pool.execute(
+          "INSERT INTO stage_ranking (stage_id, position, name, score, points_awarded, t1, presenze) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [
+            stageId,
+            player.position,
+            player.name,
+            player.score ?? null,
+            player.points_awarded,
+            player.t1 ?? 0,
+            player.presenze ?? 1,
+          ]
+        );
+      }
+    }
+
+    return NextResponse.json({ 
+      id: stageId, 
+      name, 
+      date,
+      playersCount: players?.length ?? 0
+    });
   } catch (error) {
     console.error("Error creating stage:", error);
     return NextResponse.json(

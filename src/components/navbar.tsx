@@ -27,7 +27,7 @@ const navItems = [
   },
   {
     href: "/dashboard/upload",
-    label: "Carica PDF",
+    label: "Tappe",
     icon: Upload,
   },
 ];

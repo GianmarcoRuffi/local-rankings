@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import pool from "@/lib/db";
-import { parsePdfText, getPointsForPosition, capitalizeName } from "@/lib/ranking-logic";
+import { parsePdfTableData, getPointsForPosition, capitalizeName } from "@/lib/ranking-logic";
 import { ResultSetHeader } from "mysql2";
 import { PDFParse } from "pdf-parse";
 
@@ -26,11 +26,19 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(arrayBuffer);
 
     const parser = new PDFParse({ data: buffer });
-    const textResult = await parser.getText();
-    const text = textResult.text;
+    const tableResult = await parser.getTable();
     await parser.destroy();
 
-    const players = parsePdfText(text);
+    const allRows: string[][] = [];
+    for (const page of tableResult.pages) {
+      for (const table of page.tables) {
+        for (const row of table) {
+          allRows.push(row as string[]);
+        }
+      }
+    }
+
+    const players = parsePdfTableData(allRows);
 
     if (players.length === 0) {
       return NextResponse.json(
@@ -50,15 +58,14 @@ export async function POST(request: Request) {
       const points = getPointsForPosition(player.position);
       const capitalizedName = capitalizeName(player.name);
       await pool.execute(
-        "INSERT INTO stage_ranking (stage_id, position, name, score, points_awarded, t1, presenze, raw_data) VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+        "INSERT INTO stage_ranking (stage_id, position, name, score, points_awarded, t1, presenze) VALUES (?, ?, ?, ?, ?, ?, 1)",
         [
           stageId,
           player.position,
           capitalizedName,
           player.score,
           points,
-          player.t1 || 0,
-          player.rawLine,
+          player.t1 ?? 0,
         ]
       );
     }

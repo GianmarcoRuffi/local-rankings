@@ -6,6 +6,13 @@ export interface ParsedPlayer {
   rawLine: string;
 }
 
+export interface ParsedTablePlayer {
+  position: number;
+  name: string;
+  score: number | null;
+  t1: number;
+}
+
 const POINTS_TABLE: Record<number, number> = {
   1: 25,
   2: 18,
@@ -46,6 +53,36 @@ export function parsePdfText(text: string): ParsedPlayer[] {
         players.push({ position, name, score, t1: 0, rawLine: line });
       }
     }
+  }
+
+  return players.sort((a, b) => a.position - b.position);
+}
+
+export function parsePdfTableData(
+  tableRows: string[][]
+): ParsedTablePlayer[] {
+  const players: ParsedTablePlayer[] = [];
+
+  for (const row of tableRows) {
+    if (row.length < 4) continue;
+
+    const [col0, col1, col2, col3] = row.map((c) => (c ?? "").trim());
+
+    const position = parseInt(col0, 10);
+    if (isNaN(position) || position < 1) continue;
+
+    const name = col1;
+    if (!name || name.length === 0) continue;
+
+    const scoreStr = col2.replace(",", ".");
+    const score = scoreStr !== "" && !isNaN(parseFloat(scoreStr))
+      ? parseFloat(scoreStr)
+      : null;
+
+    const t1Str = col3.replace(/\s/g, "");
+    const t1 = t1Str !== "" ? parseInt(t1Str, 10) : 0;
+
+    players.push({ position, name, score, t1: isNaN(t1) ? 0 : t1 });
   }
 
   return players.sort((a, b) => a.position - b.position);

@@ -28,7 +28,6 @@ interface UploadResult {
     score: number | null;
     points: number;
     t1: number;
-    rawLine: string;
   }>;
 }
 

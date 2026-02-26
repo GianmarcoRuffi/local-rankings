@@ -16,17 +16,36 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
-  const { name, total_points, t1, presenze } = body;
+  const { name, total_points, t1, presenze, ranking_id } = body;
 
   try {
+    // Get the ranking_id from the player if not provided
+    let effectiveRankingId = ranking_id;
+    if (!effectiveRankingId) {
+      const [playerRow] = await pool.execute<RowDataPacket[]>(
+        "SELECT ranking_id FROM general_ranking WHERE id = ?",
+        [id]
+      );
+      if (playerRow.length > 0) {
+        effectiveRankingId = playerRow[0].ranking_id;
+      }
+    }
+
     await pool.execute(
       "UPDATE general_ranking SET name = ?, total_points = ?, t1 = ?, presenze = ?, updated_at = NOW() WHERE id = ?",
       [name, total_points, t1, presenze, id]
     );
 
-    const [allPlayers] = await pool.execute<RowDataPacket[]>(
-      "SELECT id, total_points, t1 FROM general_ranking"
-    );
+    // Fetch all players in the same ranking
+    let query = "SELECT id, total_points, t1 FROM general_ranking";
+    const queryParams: (number | null)[] = [];
+    
+    if (effectiveRankingId) {
+      query += " WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))";
+      queryParams.push(effectiveRankingId, effectiveRankingId);
+    }
+
+    const [allPlayers] = await pool.execute<RowDataPacket[]>(query, queryParams);
 
     const sorted = sortRanking(
       allPlayers.map((p) => ({

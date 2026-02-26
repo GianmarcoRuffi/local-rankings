@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { useRanking } from "@/hooks/useRanking";
 import {
   Table,
   TableBody,
@@ -28,6 +29,7 @@ interface PlayerData {
 
 export function ManualStageCreator() {
   const router = useRouter();
+  const { selectedRanking } = useRanking();
   const [stageName, setStageName] = useState("");
   const [stageDate, setStageDate] = useState("");
   const [players, setPlayers] = useState<PlayerData[]>([
@@ -82,6 +84,15 @@ export function ManualStageCreator() {
   };
 
   const handleSave = async () => {
+    if (!selectedRanking) {
+      toast({
+        title: "Errore",
+        description: "Seleziona una classifica prima di creare la tappa",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!stageName.trim()) {
       toast({
         title: "Errore",
@@ -107,6 +118,7 @@ export function ManualStageCreator() {
       const payload = {
         name: stageName.trim(),
         date: stageDate || null,
+        rankingId: selectedRanking.id,
         players: playersToSave.map((p) => ({
           position: p.position,
           name: capitalizeName(p.name.trim()),
@@ -191,9 +203,19 @@ export function ManualStageCreator() {
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-primary" />
             Dati Tappa
+            {selectedRanking && (
+              <Badge variant="secondary" className="ml-2">
+                {selectedRanking.name}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!selectedRanking && (
+            <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 rounded-lg">
+              Seleziona una classifica dal menu in alto per creare la tappa.
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="stageName">Nome Tappa *</Label>
@@ -308,7 +330,7 @@ export function ManualStageCreator() {
       <div className="flex gap-3">
         <Button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !selectedRanking}
           className="gap-2"
         >
           {saving ? (

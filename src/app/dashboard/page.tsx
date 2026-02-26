@@ -6,7 +6,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold">Classifica Generale</h1>
         <p className="text-muted-foreground mt-1">
-          Classifica cumulativa della stagione
+          Classifica cumulativa della stagione - seleziona una classifica dal menu in alto
         </p>
       </div>
       <GeneralRankingTable />

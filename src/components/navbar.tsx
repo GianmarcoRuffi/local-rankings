@@ -6,6 +6,7 @@ import { signIn, signOut } from "next-auth/react";
 import { Trophy, BarChart3, Upload, LogOut, User, LogIn, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { RankingSelector } from "@/components/ranking-selector";
 
 interface NavbarProps {
   user: {
@@ -71,6 +72,7 @@ export function Navbar({ user }: NavbarProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <RankingSelector />
             {user ? (
               <>
                 <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">

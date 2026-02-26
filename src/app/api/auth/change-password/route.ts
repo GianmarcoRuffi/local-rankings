@@ -36,6 +36,9 @@ export async function POST(request: Request) {
 
   try {
     const username = session.user?.email;
+    if (!username) {
+      return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
+    }
     const [rows] = await pool.execute<UserRow[]>(
       "SELECT id, password_hash, username FROM users WHERE username = ?",
       [username]

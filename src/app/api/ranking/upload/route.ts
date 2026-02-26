@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
 import { parsePdfText, capitalizeName } from '@/lib/ranking-logic';
-import { ResultSetHeader } from 'mysql2';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import PDFParser from 'pdf2json';
 
 export async function POST(request: Request) {
@@ -18,6 +18,8 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File | null;
     const stageName = formData.get('stageName') as string | null;
     const stageDate = formData.get('stageDate') as string | null;
+    const rankingIdStr = formData.get('rankingId') as string | null;
+    const rankingId = rankingIdStr ? parseInt(rankingIdStr, 10) : null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -81,11 +83,22 @@ export async function POST(request: Request) {
       );
     }
 
+    // Get the ranking_id to use
+    let effectiveRankingId = rankingId;
+    if (!effectiveRankingId) {
+      const [defaultRanking] = await pool.execute<RowDataPacket[]>(
+        "SELECT id FROM rankings WHERE is_default = 1 LIMIT 1"
+      );
+      if (defaultRanking.length > 0) {
+        effectiveRankingId = defaultRanking[0].id;
+      }
+    }
+
     const name = stageName || file.name.replace('.pdf', '');
-    console.log('[PDF Upload] Creating stage:', name);
+    console.log('[PDF Upload] Creating stage:', name, 'for ranking:', effectiveRankingId);
     const [stageResult] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO stages (name, date, pdf_filename, status) VALUES (?, ?, ?, 'active')",
-      [name, stageDate || null, file.name],
+      "INSERT INTO stages (name, date, pdf_filename, ranking_id, status) VALUES (?, ?, ?, ?, 'active')",
+      [name, stageDate || null, file.name, effectiveRankingId],
     );
     const stageId = stageResult.insertId;
     console.log('[PDF Upload] Stage created with ID:', stageId);
@@ -115,6 +128,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       stageId,
       stageName: name,
+      rankingId: effectiveRankingId,
       playersCount: players.length,
       players: players.map((p) => ({
         ...p,

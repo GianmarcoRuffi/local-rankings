@@ -2,13 +2,24 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import { RowDataPacket, ResultSetHeader } from "mysql2";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM stages ORDER BY created_at DESC"
-    );
+    const { searchParams } = new URL(request.url);
+    const rankingId = searchParams.get("rankingId");
+
+    let query = "SELECT * FROM stages";
+    const params: (string | number)[] = [];
+
+    if (rankingId) {
+      query += " WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))";
+      params.push(rankingId, rankingId);
+    }
+
+    query += " ORDER BY created_at DESC";
+
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
     return NextResponse.json(rows);
   } catch (error) {
     console.error("Error fetching stages:", error);
@@ -27,15 +38,25 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, date, players } = body;
+    const { name, date, players, rankingId } = body;
 
-    const [result] = await pool.execute(
-      "INSERT INTO stages (name, date, status) VALUES (?, ?, 'active')",
-      [name, date || null]
+    // Get the default ranking if no rankingId provided
+    let effectiveRankingId = rankingId;
+    if (!effectiveRankingId) {
+      const [defaultRanking] = await pool.execute<RowDataPacket[]>(
+        "SELECT id FROM rankings WHERE is_default = 1 LIMIT 1"
+      );
+      if (defaultRanking.length > 0) {
+        effectiveRankingId = defaultRanking[0].id;
+      }
+    }
+
+    const [result] = await pool.execute<ResultSetHeader>(
+      "INSERT INTO stages (name, date, ranking_id, status) VALUES (?, ?, ?, 'active')",
+      [name, date || null, effectiveRankingId]
     );
 
-    const insertResult = result as { insertId: number };
-    const stageId = insertResult.insertId;
+    const stageId = result.insertId;
 
     // If players are provided, insert them
     if (players && Array.isArray(players) && players.length > 0) {
@@ -55,11 +76,12 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ 
-      id: stageId, 
-      name, 
+    return NextResponse.json({
+      id: stageId,
+      name,
       date,
-      playersCount: players?.length ?? 0
+      ranking_id: effectiveRankingId,
+      playersCount: players?.length ?? 0,
     });
   } catch (error) {
     console.error("Error creating stage:", error);

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Local Rankings",
-  description: "Gestionale classifiche torneo locale",
+  title: "Rankings Manager",
+  description: "Gestionale classifiche tornei",
 };
 
 export default function RootLayout({

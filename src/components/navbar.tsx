@@ -47,7 +47,7 @@ export function Navbar({ user }: NavbarProps) {
           <div className="flex items-center gap-6">
             <Link href="/dashboard" className="flex items-center gap-2">
               <Trophy className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg">Local Rankings</span>
+              <span className="font-bold text-lg">Rankings</span>
             </Link>
             <div className="hidden md:flex items-center gap-1">
               {navItems.map((item) => {

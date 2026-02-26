@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signIn, signOut } from "next-auth/react";
-import { Trophy, BarChart3, Upload, LogOut, User, LogIn } from "lucide-react";
+import { Trophy, BarChart3, Upload, LogOut, User, LogIn, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +77,12 @@ export function Navbar({ user }: NavbarProps) {
                   <User className="h-4 w-4" />
                   <span>{user.name || user.email}</span>
                 </div>
+                <Link href="/dashboard/change-password">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <KeyRound className="h-4 w-4" />
+                    <span className="hidden sm:inline">Cambia password</span>
+                  </Button>
+                </Link>
                 <Button
                   variant="outline"
                   size="sm"

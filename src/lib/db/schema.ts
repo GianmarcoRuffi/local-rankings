@@ -6,7 +6,6 @@ import {
   date,
   mysqlEnum,
   decimal,
-  text,
   index,
 } from "drizzle-orm/mysql-core";
 
@@ -59,7 +58,6 @@ export const stageRanking = mysqlTable(
     pointsAwarded: int("points_awarded").notNull().default(0),
     t1: int().default(0),
     presenze: int().notNull().default(1),
-    rawData: text("raw_data"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -77,7 +75,6 @@ export const generalRanking = mysqlTable(
     totalPoints: int("total_points").notNull().default(0),
     t1: int().default(0),
     presenze: int().notNull().default(0),
-    bestResults: text("best_results"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

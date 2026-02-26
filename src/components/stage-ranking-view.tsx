@@ -102,6 +102,11 @@ interface EditState {
   presenze: string;
 }
 
+interface StageEditState {
+  name: string;
+  date: string;
+}
+
 export function StageRankingView() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -123,6 +128,12 @@ export function StageRankingView() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editState, setEditState] = useState<EditState>({ name: "", points_awarded: "", t1: "", presenze: "" });
   const [saving, setSaving] = useState(false);
+  const [deletePlayerDialogOpen, setDeletePlayerDialogOpen] = useState(false);
+  const [playerToDelete, setPlayerToDelete] = useState<StageRankingPlayer | null>(null);
+  const [deletingPlayer, setDeletingPlayer] = useState(false);
+  const [editingStage, setEditingStage] = useState(false);
+  const [stageEditState, setStageEditState] = useState<StageEditState>({ name: "", date: "" });
+  const [savingStage, setSavingStage] = useState(false);
 
   const fetchStages = useCallback(async () => {
     setLoadingStages(true);
@@ -257,6 +268,32 @@ export function StageRankingView() {
     }
   };
 
+  const handleDeletePlayer = async () => {
+    if (!playerToDelete || !selectedStage) return;
+    setDeletingPlayer(true);
+    try {
+      const res = await fetch(
+        `/api/ranking/stages/${selectedStage.id}/players/${playerToDelete.id}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          title: "Giocatore eliminato",
+          description: `"${playerToDelete.name}" è stato rimosso dalla tappa.`,
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
+        setDeletePlayerDialogOpen(false);
+        setPlayerToDelete(null);
+        await fetchPlayers(selectedStage.id);
+      } else {
+        toast({ title: "Errore", description: data.error, variant: "destructive" });
+      }
+    } finally {
+      setDeletingPlayer(false);
+    }
+  };
+
   const startEdit = (player: StageRankingPlayer) => {
     setEditingId(player.id);
     setEditState({
@@ -298,6 +335,47 @@ export function StageRankingView() {
     }
   };
 
+  const startStageEdit = (stage: Stage) => {
+    setEditingStage(true);
+    setStageEditState({
+      name: stage.name,
+      date: stage.date ?? "",
+    });
+  };
+
+  const cancelStageEdit = () => {
+    setEditingStage(false);
+  };
+
+  const saveStageEdit = async () => {
+    if (!currentSelectedStage) return;
+    setSavingStage(true);
+    try {
+      const res = await fetch(`/api/ranking/stages/${currentSelectedStage.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: stageEditState.name,
+          date: stageEditState.date || null,
+        }),
+      });
+      if (res.ok) {
+        toast({
+          title: "Tappa aggiornata",
+          description: "Nome e data della tappa sono stati salvati.",
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
+        setEditingStage(false);
+        await fetchStages();
+      } else {
+        const data = await res.json();
+        toast({ title: "Errore", description: data.error, variant: "destructive" });
+      }
+    } finally {
+      setSavingStage(false);
+    }
+  };
+
   const handleSort = (key: string) => {
     setSortConfig((prev) => ({
       key,
@@ -336,6 +414,7 @@ export function StageRankingView() {
   );
 
   const currentSelectedStage = stages.find((s) => s.id === selectedStage?.id) ?? selectedStage;
+  const isActive = currentSelectedStage?.status === "active";
 
   return (
     <div className="space-y-6">
@@ -394,13 +473,46 @@ export function StageRankingView() {
       {currentSelectedStage && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                {currentSelectedStage.name}
-                <StatusBadge status={currentSelectedStage.status} />
-                <Badge variant="secondary">{players.length} giocatori</Badge>
-              </CardTitle>
-              {currentSelectedStage.date && (
+            <div className="flex-1">
+              {isAuthenticated && editingStage ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={stageEditState.name}
+                    onChange={(e) => setStageEditState((s) => ({ ...s, name: e.target.value }))}
+                    className="h-8 w-48"
+                    placeholder="Nome tappa"
+                  />
+                  <Input
+                    type="date"
+                    value={stageEditState.date}
+                    onChange={(e) => setStageEditState((s) => ({ ...s, date: e.target.value }))}
+                    className="h-8 w-40"
+                  />
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600" onClick={saveStageEdit} disabled={savingStage}>
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600" onClick={cancelStageEdit} disabled={savingStage}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <CardTitle className="flex items-center gap-2 flex-wrap">
+                  {currentSelectedStage.name}
+                  <StatusBadge status={currentSelectedStage.status} />
+                  <Badge variant="secondary">{players.length} giocatori</Badge>
+                  {isAuthenticated && isActive && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => startStageEdit(currentSelectedStage)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </CardTitle>
+              )}
+              {!editingStage && currentSelectedStage.date && (
                 <p className="text-sm text-muted-foreground mt-1">
                   Data:{" "}
                   {new Date(currentSelectedStage.date).toLocaleDateString("it-IT")}
@@ -453,7 +565,7 @@ export function StageRankingView() {
                     <SortableHead column="points_awarded">Punti Classifica</SortableHead>
                     <SortableHead column="t1">T1</SortableHead>
                     <SortableHead column="presenze">Presenze</SortableHead>
-                    {isAuthenticated && <TableHead className="w-24">Azioni</TableHead>}
+                    {isAuthenticated && isActive && <TableHead className="w-24">Azioni</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -462,7 +574,7 @@ export function StageRankingView() {
                       <TableCell className="font-medium">
                         {player.position}°
                       </TableCell>
-                      {isAuthenticated && editingId === player.id ? (
+                      {isAuthenticated && isActive && editingId === player.id ? (
                         <>
                           <TableCell>
                             <Input
@@ -522,11 +634,24 @@ export function StageRankingView() {
                           <TableCell>
                             <Badge variant="outline">{player.presenze}</Badge>
                           </TableCell>
-                          {isAuthenticated && (
+                          {isAuthenticated && isActive && (
                             <TableCell>
-                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => startEdit(player)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => startEdit(player)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    setPlayerToDelete(player);
+                                    setDeletePlayerDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           )}
                         </>
@@ -560,6 +685,41 @@ export function StageRankingView() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteStage} disabled={deleting}>
               {deleting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminazione...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Sì, elimina
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deletePlayerDialogOpen} onOpenChange={setDeletePlayerDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Eliminare il giocatore?
+            </DialogTitle>
+            <DialogDescription>
+              Stai per eliminare{" "}
+              <strong>&quot;{playerToDelete?.name}&quot;</strong> dalla tappa. Le posizioni
+              verranno ricalcolate automaticamente. Questa operazione è{" "}
+              <strong>irreversibile</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletePlayerDialogOpen(false)} disabled={deletingPlayer}>
+              Annulla
+            </Button>
+            <Button variant="destructive" onClick={handleDeletePlayer} disabled={deletingPlayer}>
+              {deletingPlayer ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                   Eliminazione...

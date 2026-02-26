@@ -53,6 +53,16 @@ function PositionBadge({ position }: { position: number }) {
     return <Badge className="bg-gray-400 text-white hover:bg-gray-400">🥈 2°</Badge>;
   if (position === 3)
     return <Badge className="bg-amber-600 text-white hover:bg-amber-600">🥉 3°</Badge>;
+  if (position === 4)
+    return <Badge className="bg-blue-600 text-white hover:bg-blue-600">4°</Badge>;
+  if (position === 5)
+    return <Badge className="bg-blue-500 text-white hover:bg-blue-500">5°</Badge>;
+  if (position === 6)
+    return <Badge className="bg-blue-400 text-white hover:bg-blue-400">6°</Badge>;
+  if (position === 7)
+    return <Badge className="bg-purple-500 text-white hover:bg-purple-500">7°</Badge>;
+  if (position === 8)
+    return <Badge className="bg-purple-400 text-white hover:bg-purple-400">8°</Badge>;
   return <span className="font-medium text-muted-foreground">{position}°</span>;
 }
 
@@ -321,7 +331,13 @@ export function GeneralRankingTable() {
                 {sortedPlayers.map((player, index) => (
                   <TableRow
                     key={player.id}
-                    className={index < 3 ? "bg-yellow-50/50 dark:bg-yellow-950/10" : ""}
+                    className={
+                      index < 3
+                        ? "bg-yellow-50/50 dark:bg-yellow-950/10"
+                        : index < 8
+                        ? "bg-blue-50/30 dark:bg-blue-950/10"
+                        : ""
+                    }
                   >
                     <TableCell>
                       <PositionBadge position={player.position} />

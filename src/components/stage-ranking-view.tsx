@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Stage, StageRankingPlayer, SortConfig } from "@/types/ranking";
 import { toast } from "@/hooks/use-toast";
+import { useRanking } from "@/hooks/useRanking";
 
 function SortIcon({ column, sortConfig }: { column: string; sortConfig: SortConfig }) {
   if (sortConfig.key !== column)
@@ -111,6 +112,7 @@ export function StageRankingView() {
   const router = useRouter();
   const { data: session } = useSession();
   const isAuthenticated = !!session;
+  const { selectedRanking } = useRanking();
   const [stages, setStages] = useState<Stage[]>([]);
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [players, setPlayers] = useState<StageRankingPlayer[]>([]);
@@ -136,9 +138,11 @@ export function StageRankingView() {
   const [savingStage, setSavingStage] = useState(false);
 
   const fetchStages = useCallback(async () => {
+    if (!selectedRanking) return;
+    
     setLoadingStages(true);
     try {
-      const res = await fetch("/api/ranking/stages");
+      const res = await fetch(`/api/ranking/stages?rankingId=${selectedRanking.id}`);
       if (res.ok) {
         const data = await res.json();
         setStages(data);
@@ -149,7 +153,7 @@ export function StageRankingView() {
     } finally {
       setLoadingStages(false);
     }
-  }, [selectedStage]);
+  }, [selectedRanking, selectedStage]);
 
   const fetchPlayers = useCallback(async (stageId: number) => {
     setLoadingPlayers(true);
@@ -167,7 +171,7 @@ export function StageRankingView() {
   useEffect(() => {
     fetchStages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedRanking]);
 
   useEffect(() => {
     if (selectedStage) {
@@ -357,6 +361,7 @@ export function StageRankingView() {
         body: JSON.stringify({
           name: stageEditState.name,
           date: stageEditState.date || null,
+          ranking_id: selectedRanking?.id,
         }),
       });
       if (res.ok) {
@@ -416,13 +421,22 @@ export function StageRankingView() {
   const currentSelectedStage = stages.find((s) => s.id === selectedStage?.id) ?? selectedStage;
   const isActive = currentSelectedStage?.status === "active";
 
+  if (!selectedRanking) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Flag className="h-10 w-10 mx-auto mb-2 opacity-30" />
+        <p>Seleziona una classifica per visualizzare le tappe</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Flag className="h-5 w-5 text-primary" />
-            Tappe giocate
+            Tappe - {selectedRanking.name}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -434,8 +448,8 @@ export function StageRankingView() {
           ) : stages.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Flag className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p>Nessuna tappa disponibile</p>
-              <p className="text-sm">Carica un PDF dalla sezione &quot;Carica PDF&quot;</p>
+              <p>Nessuna tappa per questa classifica</p>
+              <p className="text-sm">Carica un PDF dalla sezione &quot;Aggiungi tappe&quot;</p>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -538,7 +552,7 @@ export function StageRankingView() {
                     className="gap-2"
                   >
                     <Merge className="h-4 w-4" />
-                    {merging ? "Unione in corso..." : "Inserisci nella classifica generale"}
+                    {merging ? "Unione in corso..." : "Inserisci nella classifica"}
                   </Button>
                 )}
               </div>

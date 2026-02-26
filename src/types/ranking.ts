@@ -1,5 +1,15 @@
+export interface Ranking {
+  id: number;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GeneralRankingPlayer {
   id: number;
+  ranking_id: number | null;
   position: number;
   name: string;
   total_points: number;
@@ -23,6 +33,7 @@ export interface StageRankingPlayer {
 
 export interface Stage {
   id: number;
+  ranking_id: number | null;
   name: string;
   date: string | null;
   pdf_filename: string | null;

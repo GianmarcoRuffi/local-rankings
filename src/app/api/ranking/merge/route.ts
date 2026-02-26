@@ -40,6 +40,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // Get the ranking_id from the stage
+    let rankingId = stage.ranking_id;
+    if (!rankingId) {
+      const [defaultRanking] = await pool.execute<RowDataPacket[]>(
+        "SELECT id FROM rankings WHERE is_default = 1 LIMIT 1"
+      );
+      if (defaultRanking.length > 0) {
+        rankingId = defaultRanking[0].id;
+      }
+    }
+
     const [stagePlayers] = await pool.execute<RowDataPacket[]>(
       "SELECT * FROM stage_ranking WHERE stage_id = ? ORDER BY position ASC",
       [stageId]
@@ -51,8 +62,8 @@ export async function POST(request: Request) {
     try {
       for (const player of stagePlayers) {
         const [existing] = await connection.execute<RowDataPacket[]>(
-          "SELECT id, total_points, t1, presenze FROM general_ranking WHERE LOWER(name) = LOWER(?)",
-          [player.name]
+          "SELECT id, total_points, t1, presenze FROM general_ranking WHERE LOWER(name) = LOWER(?) AND (ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1)))",
+          [player.name, rankingId, rankingId]
         );
 
         if (existing.length > 0) {
@@ -63,8 +74,8 @@ export async function POST(request: Request) {
           );
         } else {
           await connection.execute<ResultSetHeader>(
-            "INSERT INTO general_ranking (name, total_points, t1, presenze, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-            [player.name, player.points_awarded, player.t1 || 0, player.presenze || 1]
+            "INSERT INTO general_ranking (name, ranking_id, total_points, t1, presenze, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())",
+            [player.name, rankingId, player.points_awarded, player.t1 || 0, player.presenze || 1]
           );
         }
       }
@@ -74,9 +85,10 @@ export async function POST(request: Request) {
         [stageId]
       );
 
-      // Riordina la classifica generale
+      // Riordina la classifica generale per questo ranking
       const [allPlayers] = await connection.execute<RowDataPacket[]>(
-        "SELECT id, total_points, t1 FROM general_ranking"
+        "SELECT id, total_points, t1 FROM general_ranking WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))",
+        [rankingId, rankingId]
       );
 
       const sorted = sortRanking(

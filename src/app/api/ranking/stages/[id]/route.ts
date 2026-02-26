@@ -15,7 +15,7 @@ export async function PUT(
 
   const { id } = await params;
   const body = await request.json();
-  const { name, date } = body;
+  const { name, date, ranking_id } = body;
 
   try {
     const [stageRows] = await pool.execute<RowDataPacket[]>(
@@ -35,8 +35,8 @@ export async function PUT(
     }
 
     await pool.execute(
-      "UPDATE stages SET name = ?, date = ? WHERE id = ?",
-      [name, date || null, id]
+      "UPDATE stages SET name = ?, date = ?, ranking_id = ? WHERE id = ?",
+      [name, date || null, ranking_id || null, id]
     );
 
     return NextResponse.json({ success: true });

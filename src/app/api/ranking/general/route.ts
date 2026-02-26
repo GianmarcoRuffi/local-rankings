@@ -3,11 +3,21 @@ import pool from "@/lib/db";
 import { RowDataPacket } from "mysql2";
 import { sortRanking } from "@/lib/ranking-logic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM general_ranking"
-    );
+    const { searchParams } = new URL(request.url);
+    const rankingId = searchParams.get("rankingId");
+
+    let query = "SELECT * FROM general_ranking";
+    const params: (string | number)[] = [];
+
+    if (rankingId) {
+      // Include entries for this specific ranking
+      query += " WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))";
+      params.push(rankingId, rankingId);
+    }
+
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
 
     // Ordina usando il comparatore personalizzato
     const sorted = sortRanking(

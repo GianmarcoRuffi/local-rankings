@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { useRanking } from "@/hooks/useRanking";
 import {
   Table,
   TableBody,
@@ -21,6 +22,7 @@ import {
 interface UploadResult {
   stageId: number;
   stageName: string;
+  rankingId: number | null;
   playersCount: number;
   players: Array<{
     position: number;
@@ -33,6 +35,7 @@ interface UploadResult {
 
 export function PdfUploader() {
   const router = useRouter();
+  const { selectedRanking } = useRanking();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [stageName, setStageName] = useState("");
@@ -65,6 +68,15 @@ export function PdfUploader() {
 
   const handleUpload = async () => {
     if (!file) return;
+    if (!selectedRanking) {
+      toast({
+        title: "Errore",
+        description: "Seleziona una classifica prima di caricare",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
     setError(null);
 
@@ -73,6 +85,7 @@ export function PdfUploader() {
       formData.append("file", file);
       if (stageName) formData.append("stageName", stageName);
       if (stageDate) formData.append("stageDate", stageDate);
+      formData.append("rankingId", String(selectedRanking.id));
 
       const res = await fetch("/api/ranking/upload", {
         method: "POST",
@@ -117,9 +130,21 @@ export function PdfUploader() {
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5 text-primary" />
             Importa Classifica PDF
+            {selectedRanking && (
+              <Badge variant="secondary" className="ml-2">
+                {selectedRanking.name}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {!selectedRanking && (
+            <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 rounded-lg">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Seleziona una classifica dal menu in alto per importare le tappe.</span>
+            </div>
+          )}
+
           <div
             className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
               dragOver
@@ -200,7 +225,7 @@ export function PdfUploader() {
           <div className="flex gap-3">
             <Button
               onClick={handleUpload}
-              disabled={!file || uploading}
+              disabled={!file || uploading || !selectedRanking}
               className="gap-2"
             >
               {uploading ? (

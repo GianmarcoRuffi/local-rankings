@@ -2,10 +2,12 @@ import {
   mysqlTable,
   int,
   varchar,
+  text,
   timestamp,
   date,
   mysqlEnum,
   decimal,
+  boolean,
   index,
 } from "drizzle-orm/mysql-core";
 
@@ -25,10 +27,27 @@ export const users = mysqlTable(
   (table) => [index("idx_username").on(table.username)]
 );
 
+export const rankings = mysqlTable(
+  "rankings",
+  {
+    id: int().autoincrement().primaryKey(),
+    name: varchar({ length: 200 }).notNull().unique(),
+    description: text(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("idx_is_default").on(table.isDefault)]
+);
+
 export const stages = mysqlTable(
   "stages",
   {
     id: int().autoincrement().primaryKey(),
+    rankingId: int("ranking_id"),
     name: varchar({ length: 200 }).notNull(),
     date: date(),
     pdfFilename: varchar("pdf_filename", { length: 255 }),
@@ -44,6 +63,7 @@ export const stages = mysqlTable(
   (table) => [
     index("idx_status").on(table.status),
     index("idx_created_at").on(table.createdAt),
+    index("idx_ranking_id").on(table.rankingId),
   ]
 );
 
@@ -70,8 +90,9 @@ export const generalRanking = mysqlTable(
   "general_ranking",
   {
     id: int().autoincrement().primaryKey(),
+    rankingId: int("ranking_id"),
     position: int().default(0),
-    name: varchar({ length: 200 }).notNull().unique(),
+    name: varchar({ length: 200 }).notNull(),
     totalPoints: int("total_points").notNull().default(0),
     t1: int().default(0),
     presenze: int().notNull().default(0),
@@ -85,5 +106,6 @@ export const generalRanking = mysqlTable(
     index("idx_total_points").on(table.totalPoints),
     index("idx_name").on(table.name),
     index("idx_position").on(table.position),
+    index("idx_gr_ranking_id").on(table.rankingId),
   ]
 );

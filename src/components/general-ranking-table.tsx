@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import {
   ChevronUp,
@@ -13,7 +13,10 @@ import {
   Check,
   X,
   Download,
+  FileText,
 } from "lucide-react";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import {
   Table,
   TableBody,
@@ -90,6 +93,20 @@ function T1Badge({ t1 }: { t1: number }) {
   );
 }
 
+function getPositionColor(position: number): string {
+  const colors: Record<number, string> = {
+    1: "#eab308",
+    2: "#9ca3af",
+    3: "#d97706",
+    4: "#2563eb",
+    5: "#3b82f6",
+    6: "#60a5fa",
+    7: "#a855f7",
+    8: "#c084fc",
+  };
+  return colors[position] || "#6b7280";
+}
+
 interface EditState {
   name: string;
   total_points: string;
@@ -112,6 +129,8 @@ export function GeneralRankingTable() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editState, setEditState] = useState<EditState>({ name: "", total_points: "", t1: "", presenze: "" });
   const [saving, setSaving] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const pdfTableRef = useRef<HTMLDivElement>(null);
 
   const fetchPlayers = useCallback(async () => {
     if (!selectedRanking) return;
@@ -264,6 +283,59 @@ export function GeneralRankingTable() {
     XLSX.writeFile(wb, filename);
   };
 
+  const exportToPDF = async () => {
+    if (!pdfTableRef.current || sortedPlayers.length === 0) return;
+
+    setExportingPdf(true);
+    try {
+      const canvas = await html2canvas(pdfTableRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgWidth = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      const pdf = new jsPDF("landscape", "mm", "a4");
+
+      pdf.setFontSize(18);
+      pdf.text(`Classifica ${selectedRanking?.name || "Generale"}`, 14, 15);
+      pdf.setFontSize(10);
+      pdf.text(
+        `${players.length} giocatori - Esportato il ${new Date().toLocaleDateString("it-IT")}`,
+        14,
+        22
+      );
+
+      const imgData = canvas.toDataURL("image/png");
+      const availableHeight = 190;
+      const scaledHeight = Math.min(imgHeight, availableHeight);
+      const scaledWidth = (scaledHeight / imgHeight) * imgWidth;
+
+      pdf.addImage(imgData, "PNG", 14, 28, scaledWidth, scaledHeight);
+
+      const filename = selectedRanking
+        ? `classifica_${selectedRanking.name.toLowerCase().replace(/\s+/g, "_")}.pdf`
+        : "classifica_generale.pdf";
+      pdf.save(filename);
+
+      toast({
+        title: "PDF esportato",
+        description: "Il file è stato scaricato.",
+        variant: "success" as Parameters<typeof toast>[0]["variant"],
+      });
+    } catch {
+      toast({
+        title: "Errore",
+        description: "Impossibile esportare il PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const SortableHead = ({ column, children }: { column: string; children: React.ReactNode }) => (
     <TableHead
       className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
@@ -298,6 +370,24 @@ export function GeneralRankingTable() {
             >
               <Download className="h-4 w-4 mr-2" />
               Esporta Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToPDF}
+              disabled={loading || players.length === 0 || exportingPdf}
+            >
+              {exportingPdf ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Esportando...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Esporta PDF
+                </>
+              )}
             </Button>
             <Button
               variant="destructive"
@@ -425,6 +515,91 @@ export function GeneralRankingTable() {
           </Table>
         )}
       </CardContent>
+
+      {/* Hidden container for PDF export */}
+      <div style={{ position: "absolute", left: -9999, top: -9999, zIndex: -9999 }}>
+        <div
+          ref={pdfTableRef}
+          style={{
+            backgroundColor: "#ffffff",
+            padding: "20px",
+            fontFamily: "Arial, sans-serif",
+            minWidth: "800px",
+          }}
+        >
+          <div style={{ marginBottom: "16px" }}>
+            <h1 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "4px", color: "#1f2937" }}>
+              Classifica {selectedRanking?.name || "Generale"}
+            </h1>
+            <p style={{ fontSize: "14px", color: "#6b7280" }}>
+              {players.length} giocatori - {new Date().toLocaleDateString("it-IT")}
+            </p>
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <thead>
+              <tr style={{ backgroundColor: "#f1f5f9", borderBottom: "2px solid #e2e8f0" }}>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>Pos.</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>Giocatore</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>Punti Totali</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>T1</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>Presenze</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedPlayers.map((player, index) => {
+                const bgColor = index < 3 ? "#fefce8" : index < 8 ? "#eff6ff" : "#ffffff";
+                const t1Value = player.t1 ?? 0;
+                const t1Color = t1Value > 0 ? "#16a34a" : t1Value < 0 ? "#dc2626" : "#6b7280";
+                const t1BgColor = t1Value > 0 ? "#dcfce7" : t1Value < 0 ? "#fee2e2" : "#f3f4f6";
+                const t1BorderColor = t1Value > 0 ? "#86efac" : t1Value < 0 ? "#fca5a5" : "#d1d5db";
+                
+                return (
+                  <tr key={player.id} style={{ backgroundColor: bgColor, borderBottom: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: "8px 12px" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          padding: "3px 10px",
+                          borderRadius: "6px",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          color: "#ffffff",
+                          backgroundColor: getPositionColor(player.position),
+                        }}
+                      >
+                        {player.position <= 3 ? ["🥇", "🥈", "🥉"][player.position - 1] + " " : ""}
+                        {player.position}°
+                      </span>
+                    </td>
+                    <td style={{ padding: "8px 12px", fontWeight: "500", color: "#1f2937" }}>{player.name}</td>
+                    <td style={{ padding: "8px 12px", fontWeight: "bold", fontSize: "15px", color: "#1f2937" }}>
+                      {player.total_points}
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          padding: "3px 10px",
+                          borderRadius: "6px",
+                          fontWeight: "bold",
+                          fontSize: "12px",
+                          color: t1Color,
+                          backgroundColor: t1BgColor,
+                          border: `1px solid ${t1BorderColor}`,
+                        }}
+                      >
+                        {t1Value > 0 ? "+" : ""}
+                        {t1Value}
+                      </span>
+                    </td>
+                    <td style={{ padding: "8px 12px", color: "#374151" }}>{player.presenze}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <DialogContent>

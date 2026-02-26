@@ -20,7 +20,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { useRanking } from "@/hooks/useRanking";
 import { Ranking } from "@/types/ranking";
@@ -173,9 +172,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
           value={selectedRanking ? String(selectedRanking.id) : ""}
           onValueChange={handleSelectRanking}
         >
-          <SelectTrigger className="w-[220px]">
+          <SelectTrigger className="w-[220px] cursor-pointer">
             <List className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Seleziona classifica" />
+            <span className="truncate">
+              {selectedRanking?.name || "Seleziona classifica"}
+            </span>
           </SelectTrigger>
           <SelectContent>
             {rankings.map((ranking) => (
@@ -192,42 +193,44 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
         </Select>
 
         {isAuthenticated && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              setNewName("");
-              setNewDescription("");
-              setCreateDialogOpen(true);
-            }}
-            title="Crea nuova classifica"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        )}
-
-        {isAuthenticated && selectedRanking && (
-          <>
+          <div className="flex items-center gap-1 px-1 border-l border-border ml-1 pl-3">
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
-              onClick={() => openEditDialog(selectedRanking)}
-              title="Modifica classifica"
+              onClick={() => {
+                setNewName("");
+                setNewDescription("");
+                setCreateDialogOpen(true);
+              }}
+              title="Crea nuova classifica"
             >
-              <Pencil className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
             </Button>
-            {!selectedRanking.is_default && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={() => openDeleteDialog(selectedRanking)}
-                title="Elimina classifica"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+
+            {selectedRanking && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openEditDialog(selectedRanking)}
+                  title="Modifica classifica"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                {!selectedRanking.is_default && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => openDeleteDialog(selectedRanking)}
+                    title="Elimina classifica"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </>
             )}
-          </>
+          </div>
         )}
       </div>
 

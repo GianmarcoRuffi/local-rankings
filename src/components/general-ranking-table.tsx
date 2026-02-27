@@ -67,6 +67,8 @@ function PositionBadge({ position }: { position: number }) {
     return <Badge className="bg-purple-500 text-white hover:bg-purple-500">7°</Badge>;
   if (position === 8)
     return <Badge className="bg-purple-400 text-white hover:bg-purple-400">8°</Badge>;
+  if (position === 9)
+    return <Badge className="bg-indigo-500 text-white hover:bg-indigo-500">9°</Badge>;
   return <span className="font-medium text-muted-foreground">{position}°</span>;
 }
 
@@ -103,6 +105,7 @@ function getPositionColor(position: number): string {
     6: "#60a5fa",
     7: "#a855f7",
     8: "#c084fc",
+    9: "#6366f1",
   };
   return colors[position] || "#6b7280";
 }
@@ -311,6 +314,7 @@ export function GeneralRankingTable() {
         6: [96, 165, 250],  // blue-400
         7: [168, 85, 247],  // purple-500
         8: [192, 132, 252], // purple-400
+        9: [99, 102, 241],  // indigo-500
       };
       return colors[pos] || [107, 114, 128];
     };
@@ -347,22 +351,22 @@ export function GeneralRankingTable() {
         const rowIndex = row.index;
         const player = sortedPlayers[rowIndex];
 
-        // Position cell coloring (1-8)
-        if (column.index === 0 && player.position <= 8) {
+        // Position cell coloring (1-9)
+        if (column.index === 0 && player.position <= 9) {
           cell.styles.fillColor = getPositionColor(player.position);
           cell.styles.textColor = [255, 255, 255];
           cell.styles.fontStyle = "bold";
         }
 
-        // Row background highlighting (yellow for top 3, blue for 4-8)
+        // Row background highlighting (yellow for top 3, blue for 4-9)
         if (rowIndex < 3) {
           cell.styles.fillColor = [254, 252, 232]; // yellow-50
-          if (column.index === 0 && player.position <= 8) {
+          if (column.index === 0 && player.position <= 9) {
             cell.styles.fillColor = getPositionColor(player.position);
           }
-        } else if (rowIndex < 8) {
+        } else if (rowIndex < 9) {
           cell.styles.fillColor = [239, 246, 255]; // blue-50
-          if (column.index === 0 && player.position <= 8) {
+          if (column.index === 0 && player.position <= 9) {
             cell.styles.fillColor = getPositionColor(player.position);
           }
         }
@@ -481,7 +485,7 @@ export function GeneralRankingTable() {
                   className={
                     index < 3
                       ? "bg-yellow-50/50 dark:bg-yellow-950/10"
-                      : index < 8
+                      : index < 9
                       ? "bg-blue-50/30 dark:bg-blue-950/10"
                       : ""
                   }

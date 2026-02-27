@@ -315,17 +315,11 @@ export function GeneralRankingTable() {
       return colors[pos] || [107, 114, 128];
     };
 
-    // Medal helper
-    const getMedal = (pos: number): string => {
-      const medals = ["1*", "2*", "3*"];
-      return pos <= 3 ? medals[pos - 1] + " " : "";
-    };
-
     autoTable(doc, {
       startY: 28,
       head: [["Pos.", "Giocatore", "Punti Totali", "T1", "Presenze"]],
       body: sortedPlayers.map((p) => [
-        `${getMedal(p.position)}${p.position}°`,
+        `${p.position}°`,
         p.name,
         p.total_points,
         (p.t1 ?? 0) > 0 ? `+${p.t1}` : String(p.t1 ?? 0),

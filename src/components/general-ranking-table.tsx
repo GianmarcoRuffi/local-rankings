@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import {
   ChevronUp,
@@ -15,8 +15,8 @@ import {
   Download,
   FileText,
 } from "lucide-react";
-import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   Table,
   TableBody,
@@ -129,8 +129,6 @@ export function GeneralRankingTable() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editState, setEditState] = useState<EditState>({ name: "", total_points: "", t1: "", presenze: "" });
   const [saving, setSaving] = useState(false);
-  const [exportingPdf, setExportingPdf] = useState(false);
-  const pdfTableRef = useRef<HTMLDivElement>(null);
 
   const fetchPlayers = useCallback(async () => {
     if (!selectedRanking) return;
@@ -283,57 +281,121 @@ export function GeneralRankingTable() {
     XLSX.writeFile(wb, filename);
   };
 
-  const exportToPDF = async () => {
-    if (!pdfTableRef.current || sortedPlayers.length === 0) return;
+  const exportToPDF = () => {
+    if (sortedPlayers.length === 0) return;
 
-    setExportingPdf(true);
-    try {
-      const canvas = await html2canvas(pdfTableRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
+    const doc = new jsPDF("p", "mm", "a4");
 
-      const imgWidth = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    // Title
+    doc.setFontSize(18);
+    doc.setTextColor(31, 41, 55);
+    doc.text(`Classifica ${selectedRanking?.name || "Generale"}`, 14, 15);
 
-      const pdf = new jsPDF("landscape", "mm", "a4");
+    // Subtitle
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128);
+    doc.text(
+      `${players.length} giocatori - Esportato il ${new Date().toLocaleDateString("it-IT")}`,
+      14,
+      22
+    );
 
-      pdf.setFontSize(18);
-      pdf.text(`Classifica ${selectedRanking?.name || "Generale"}`, 14, 15);
-      pdf.setFontSize(10);
-      pdf.text(
-        `${players.length} giocatori - Esportato il ${new Date().toLocaleDateString("it-IT")}`,
-        14,
-        22
-      );
+    // Position colors helper (RGB)
+    const getPositionColor = (pos: number): [number, number, number] => {
+      const colors: Record<number, [number, number, number]> = {
+        1: [234, 179, 8],   // yellow-500
+        2: [156, 163, 175], // gray-400
+        3: [217, 119, 6],   // amber-600
+        4: [37, 99, 235],   // blue-600
+        5: [59, 130, 246],  // blue-500
+        6: [96, 165, 250],  // blue-400
+        7: [168, 85, 247],  // purple-500
+        8: [192, 132, 252], // purple-400
+      };
+      return colors[pos] || [107, 114, 128];
+    };
 
-      const imgData = canvas.toDataURL("image/png");
-      const availableHeight = 190;
-      const scaledHeight = Math.min(imgHeight, availableHeight);
-      const scaledWidth = (scaledHeight / imgHeight) * imgWidth;
+    // Medal helper
+    const getMedal = (pos: number): string => {
+      const medals = ["1*", "2*", "3*"];
+      return pos <= 3 ? medals[pos - 1] + " " : "";
+    };
 
-      pdf.addImage(imgData, "PNG", 14, 28, scaledWidth, scaledHeight);
+    autoTable(doc, {
+      startY: 28,
+      head: [["Pos.", "Giocatore", "Punti Totali", "T1", "Presenze"]],
+      body: sortedPlayers.map((p) => [
+        `${getMedal(p.position)}${p.position}°`,
+        p.name,
+        p.total_points,
+        (p.t1 ?? 0) > 0 ? `+${p.t1}` : String(p.t1 ?? 0),
+        p.presenze,
+      ]),
+      styles: { fontSize: 10, cellPadding: 3 },
+      headStyles: {
+        fillColor: [241, 245, 249],
+        textColor: [55, 65, 81],
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 25, halign: "center" },
+        1: { cellWidth: 70 },
+        2: { cellWidth: 30, halign: "center" },
+        3: { cellWidth: 25, halign: "center" },
+        4: { cellWidth: 25, halign: "center" },
+      },
+      didParseCell: (hookData) => {
+        const { row, column, cell } = hookData;
 
-      const filename = selectedRanking
-        ? `classifica_${selectedRanking.name.toLowerCase().replace(/\s+/g, "_")}.pdf`
-        : "classifica_generale.pdf";
-      pdf.save(filename);
+        // Skip header
+        if (row.section === "head") return;
 
-      toast({
-        title: "PDF esportato",
-        description: "Il file è stato scaricato.",
-        variant: "success" as Parameters<typeof toast>[0]["variant"],
-      });
-    } catch {
-      toast({
-        title: "Errore",
-        description: "Impossibile esportare il PDF.",
-        variant: "destructive",
-      });
-    } finally {
-      setExportingPdf(false);
-    }
+        const rowIndex = row.index;
+        const player = sortedPlayers[rowIndex];
+
+        // Position cell coloring (1-8)
+        if (column.index === 0 && player.position <= 8) {
+          cell.styles.fillColor = getPositionColor(player.position);
+          cell.styles.textColor = [255, 255, 255];
+          cell.styles.fontStyle = "bold";
+        }
+
+        // Row background highlighting (yellow for top 3, blue for 4-8)
+        if (rowIndex < 3) {
+          cell.styles.fillColor = [254, 252, 232]; // yellow-50
+          if (column.index === 0 && player.position <= 8) {
+            cell.styles.fillColor = getPositionColor(player.position);
+          }
+        } else if (rowIndex < 8) {
+          cell.styles.fillColor = [239, 246, 255]; // blue-50
+          if (column.index === 0 && player.position <= 8) {
+            cell.styles.fillColor = getPositionColor(player.position);
+          }
+        }
+
+        // T1 cell coloring
+        if (column.index === 3) {
+          const t1Value = player.t1 ?? 0;
+          if (t1Value > 0) {
+            cell.styles.textColor = [22, 163, 74]; // green-600
+          } else if (t1Value < 0) {
+            cell.styles.textColor = [220, 38, 38]; // red-600
+          }
+          cell.styles.fontStyle = "bold";
+        }
+      },
+    });
+
+    const filename = selectedRanking
+      ? `classifica_${selectedRanking.name.toLowerCase().replace(/\s+/g, "_")}.pdf`
+      : "classifica_generale.pdf";
+    doc.save(filename);
+
+    toast({
+      title: "PDF esportato",
+      description: "Il file è stato scaricato.",
+      variant: "success" as Parameters<typeof toast>[0]["variant"],
+    });
   };
 
   const SortableHead = ({ column, children }: { column: string; children: React.ReactNode }) => (
@@ -375,19 +437,10 @@ export function GeneralRankingTable() {
               variant="outline"
               size="sm"
               onClick={exportToPDF}
-              disabled={loading || players.length === 0 || exportingPdf}
+              disabled={loading || players.length === 0}
             >
-              {exportingPdf ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Esportando...
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Esporta PDF
-                </>
-              )}
+              <FileText className="h-4 w-4 mr-2" />
+              Esporta PDF
             </Button>
             <Button
               variant="destructive"
@@ -515,91 +568,6 @@ export function GeneralRankingTable() {
           </Table>
         )}
       </CardContent>
-
-      {/* Hidden container for PDF export */}
-      <div style={{ position: "absolute", left: -9999, top: -9999, zIndex: -9999 }}>
-        <div
-          ref={pdfTableRef}
-          style={{
-            backgroundColor: "#ffffff",
-            padding: "20px",
-            fontFamily: "Arial, sans-serif",
-            minWidth: "800px",
-          }}
-        >
-          <div style={{ marginBottom: "16px" }}>
-            <h1 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "4px", color: "#1f2937" }}>
-              Classifica {selectedRanking?.name || "Generale"}
-            </h1>
-            <p style={{ fontSize: "14px", color: "#6b7280" }}>
-              {players.length} giocatori - {new Date().toLocaleDateString("it-IT")}
-            </p>
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f1f5f9", borderBottom: "2px solid #e2e8f0" }}>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>Pos.</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>Giocatore</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>Punti Totali</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>T1</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: "600", color: "#374151" }}>Presenze</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedPlayers.map((player, index) => {
-                const bgColor = index < 3 ? "#fefce8" : index < 8 ? "#eff6ff" : "#ffffff";
-                const t1Value = player.t1 ?? 0;
-                const t1Color = t1Value > 0 ? "#16a34a" : t1Value < 0 ? "#dc2626" : "#6b7280";
-                const t1BgColor = t1Value > 0 ? "#dcfce7" : t1Value < 0 ? "#fee2e2" : "#f3f4f6";
-                const t1BorderColor = t1Value > 0 ? "#86efac" : t1Value < 0 ? "#fca5a5" : "#d1d5db";
-                
-                return (
-                  <tr key={player.id} style={{ backgroundColor: bgColor, borderBottom: "1px solid #e2e8f0" }}>
-                    <td style={{ padding: "8px 12px" }}>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          padding: "3px 10px",
-                          borderRadius: "6px",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                          color: "#ffffff",
-                          backgroundColor: getPositionColor(player.position),
-                        }}
-                      >
-                        {player.position <= 3 ? ["🥇", "🥈", "🥉"][player.position - 1] + " " : ""}
-                        {player.position}°
-                      </span>
-                    </td>
-                    <td style={{ padding: "8px 12px", fontWeight: "500", color: "#1f2937" }}>{player.name}</td>
-                    <td style={{ padding: "8px 12px", fontWeight: "bold", fontSize: "15px", color: "#1f2937" }}>
-                      {player.total_points}
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          padding: "3px 10px",
-                          borderRadius: "6px",
-                          fontWeight: "bold",
-                          fontSize: "12px",
-                          color: t1Color,
-                          backgroundColor: t1BgColor,
-                          border: `1px solid ${t1BorderColor}`,
-                        }}
-                      >
-                        {t1Value > 0 ? "+" : ""}
-                        {t1Value}
-                      </span>
-                    </td>
-                    <td style={{ padding: "8px 12px", color: "#374151" }}>{player.presenze}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <DialogContent>

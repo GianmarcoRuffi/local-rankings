@@ -16,10 +16,7 @@ const pool =
   globalForDb.pool ??
   new Pool({
     connectionString,
-    ssl:
-      process.env.NODE_ENV === 'production'
-        ? { rejectUnauthorized: true }
-        : { rejectUnauthorized: false },
+    ssl: { rejectUnauthorized: false },
   });
 
 if (process.env.NODE_ENV !== 'production') {

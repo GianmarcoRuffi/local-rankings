@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import pool from '@/lib/db';
+import { db } from '@/lib/db';
+import { stages, rankings, stageRanking } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import { parsePdfText, capitalizeName } from '@/lib/ranking-logic';
-import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import PDFParser from 'pdf2json';
 
 export async function POST(request: Request) {
@@ -86,9 +87,11 @@ export async function POST(request: Request) {
     // Get the ranking_id to use
     let effectiveRankingId = rankingId;
     if (!effectiveRankingId) {
-      const [defaultRanking] = await pool.execute<RowDataPacket[]>(
-        "SELECT id FROM rankings WHERE is_default = 1 LIMIT 1"
-      );
+      const defaultRanking = await db
+        .select({ id: rankings.id })
+        .from(rankings)
+        .where(eq(rankings.isDefault, true))
+        .limit(1);
       if (defaultRanking.length > 0) {
         effectiveRankingId = defaultRanking[0].id;
       }
@@ -96,37 +99,42 @@ export async function POST(request: Request) {
 
     const name = stageName || file.name.replace('.pdf', '');
     console.log('[PDF Upload] Creating stage:', name, 'for ranking:', effectiveRankingId);
-    const [stageResult] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO stages (name, date, pdf_filename, ranking_id, status) VALUES (?, ?, ?, ?, 'active')",
-      [name, stageDate || null, file.name, effectiveRankingId],
-    );
-    const stageId = stageResult.insertId;
-    console.log('[PDF Upload] Stage created with ID:', stageId);
+    
+    const result = await db.transaction(async (tx) => {
+      const [insertedStage] = await tx
+        .insert(stages)
+        .values({
+          name,
+          date: stageDate ? new Date(stageDate).toISOString().split('T')[0] : null,
+          pdfFilename: file.name,
+          rankingId: effectiveRankingId,
+          status: 'active',
+        })
+        .returning();
 
-    console.log('[PDF Upload] Inserting players...');
-    for (const player of players) {
-      // Calcola i punti come VP * 3
-      const points = (player.score ?? 0) * 3;
-      const capitalizedName = capitalizeName(player.name);
-      console.log(
-        `[PDF Upload] Inserting player ${player.position}: ${capitalizedName}, VP: ${player.score}, Points: ${points}, T1: ${player.t1}`,
-      );
-      await pool.execute(
-        'INSERT INTO stage_ranking (stage_id, position, name, score, points_awarded, t1, presenze) VALUES (?, ?, ?, ?, ?, ?, 1)',
-        [
-          stageId,
-          player.position,
-          capitalizedName,
-          player.score,
-          points,
-          player.t1 ?? 0,
-        ],
-      );
-    }
+      const stageId = insertedStage.id;
+      console.log('[PDF Upload] Stage created with ID:', stageId);
+
+      console.log('[PDF Upload] Inserting players...');
+      const playersToInsert = players.map((player) => ({
+        stageId,
+        position: player.position,
+        name: capitalizeName(player.name),
+        score: player.score?.toString() ?? null,
+        pointsAwarded: (player.score ?? 0) * 3,
+        t1: player.t1 ?? 0,
+        presenze: 1,
+      }));
+
+      await tx.insert(stageRanking).values(playersToInsert);
+      
+      return { stageId };
+    });
+
     console.log('[PDF Upload] All players inserted successfully');
 
     return NextResponse.json({
-      stageId,
+      stageId: result.stageId,
       stageName: name,
       rankingId: effectiveRankingId,
       playersCount: players.length,

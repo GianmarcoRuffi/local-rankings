@@ -1,25 +1,32 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket, ResultSetHeader } from "mysql2";
+import { db } from "@/lib/db";
+import { stages, rankings, stageRanking } from "@/lib/db/schema";
+import { eq, or, and, isNull, desc, sql } from "drizzle-orm";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const rankingId = searchParams.get("rankingId");
+    const rankingIdStr = searchParams.get("rankingId");
+    const rankingId = rankingIdStr ? parseInt(rankingIdStr) : null;
 
-    let query = "SELECT * FROM stages";
-    const params: (string | number)[] = [];
+    let query = db.select().from(stages);
 
     if (rankingId) {
-      query += " WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))";
-      params.push(rankingId, rankingId);
+      // WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))
+      query.where(
+        or(
+          eq(stages.rankingId, rankingId),
+          and(
+            isNull(stages.rankingId),
+            sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
+          )
+        )
+      );
     }
 
-    query += " ORDER BY created_at DESC";
-
-    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    const rows = await query.orderBy(desc(stages.createdAt));
     return NextResponse.json(rows);
   } catch (error) {
     console.error("Error fetching stages:", error);
@@ -41,46 +48,55 @@ export async function POST(request: Request) {
     const { name, date, players, rankingId } = body;
 
     // Get the default ranking if no rankingId provided
-    let effectiveRankingId = rankingId;
+    let effectiveRankingId = rankingId ? parseInt(rankingId) : null;
     if (!effectiveRankingId) {
-      const [defaultRanking] = await pool.execute<RowDataPacket[]>(
-        "SELECT id FROM rankings WHERE is_default = 1 LIMIT 1"
-      );
+      const defaultRanking = await db
+        .select({ id: rankings.id })
+        .from(rankings)
+        .where(eq(rankings.isDefault, true))
+        .limit(1);
+      
       if (defaultRanking.length > 0) {
         effectiveRankingId = defaultRanking[0].id;
       }
     }
 
-    const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO stages (name, date, ranking_id, status) VALUES (?, ?, ?, 'active')",
-      [name, date || null, effectiveRankingId]
-    );
+    const result = await db.transaction(async (tx) => {
+      const [insertedStage] = await tx
+        .insert(stages)
+        .values({
+          name,
+          date: date ? new Date(date).toISOString().split('T')[0] : null,
+          rankingId: effectiveRankingId,
+          status: "active",
+        })
+        .returning();
 
-    const stageId = result.insertId;
+      const stageId = insertedStage.id;
 
-    // If players are provided, insert them
-    if (players && Array.isArray(players) && players.length > 0) {
-      for (const player of players) {
-        await pool.execute(
-          "INSERT INTO stage_ranking (stage_id, position, name, score, points_awarded, t1, presenze) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [
-            stageId,
-            player.position,
-            player.name,
-            player.score ?? null,
-            player.points_awarded,
-            player.t1 ?? 0,
-            player.presenze ?? 1,
-          ]
-        );
+      // If players are provided, insert them
+      if (players && Array.isArray(players) && players.length > 0) {
+        const playersToInsert = players.map((player: any) => ({
+          stageId,
+          position: player.position,
+          name: player.name,
+          score: player.score?.toString() ?? null,
+          pointsAwarded: player.points_awarded,
+          t1: player.t1 ?? 0,
+          presenze: player.presenze ?? 1,
+        }));
+
+        await tx.insert(stageRanking).values(playersToInsert);
       }
-    }
+
+      return { stageId, effectiveRankingId };
+    });
 
     return NextResponse.json({
-      id: stageId,
+      id: result.stageId,
       name,
       date,
-      ranking_id: effectiveRankingId,
+      ranking_id: result.effectiveRankingId,
       playersCount: players?.length ?? 0,
     });
   } catch (error) {

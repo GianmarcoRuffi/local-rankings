@@ -2,9 +2,8 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
 
-interface UserRow extends RowDataPacket {
+interface UserRow {
   id: number;
   username: string;
   password_hash: string;
@@ -25,16 +24,16 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const [rows] = await pool.execute<UserRow[]>(
-            "SELECT id, username, password_hash, display_name FROM users WHERE username = ?",
+          const result = await pool.query<UserRow>(
+            "SELECT id, username, password_hash, display_name FROM users WHERE username = $1",
             [credentials.username]
           );
 
-          if (rows.length === 0) {
+          if (result.rows.length === 0) {
             return null;
           }
 
-          const user = rows[0];
+          const user = result.rows[0];
           const isValid = await bcrypt.compare(
             credentials.password,
             user.password_hash

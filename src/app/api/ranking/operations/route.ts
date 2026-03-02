@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket, ResultSetHeader } from "mysql2";
+import { db } from "@/lib/db";
+import { stageRanking, generalRanking } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 import { sortRanking, capitalizeName } from "@/lib/ranking-logic";
 
-interface PlayerRow extends RowDataPacket {
-  id: number;
-  name: string;
-  total_points: number;
-  t1: number;
-  position: number;
-}
 
 /**
  * API per operazioni di gestione tabella
@@ -39,153 +33,109 @@ export async function POST(request: Request) {
       );
     }
 
-    const tableName = target === "stage" ? "stage_ranking" : "general_ranking";
+    const table = target === "stage" ? stageRanking : generalRanking;
 
     switch (operation) {
       case "sortByName": {
-        const [rows] = await pool.execute<PlayerRow[]>(
-          `SELECT * FROM ${tableName}`
-        );
+        const rows = await db.select().from(table);
         
         // Ordina alfabeticamente per nome
         const sorted = [...rows].sort((a, b) => 
           a.name.localeCompare(b.name, "it")
         );
 
-        const connection = await pool.getConnection();
-        await connection.beginTransaction();
-
-        try {
+        await db.transaction(async (tx) => {
           for (let i = 0; i < sorted.length; i++) {
-            await connection.execute(
-              `UPDATE ${tableName} SET position = ? WHERE id = ?`,
-              [i + 1, sorted[i].id]
-            );
+            await tx
+              .update(table)
+              .set({ position: i + 1 })
+              .where(eq(table.id, sorted[i].id));
           }
-          await connection.commit();
-          connection.release();
+        });
 
-          return NextResponse.json({
-            success: true,
-            message: `Ordinamento alfabetico completato`,
-            count: sorted.length,
-          });
-        } catch (error) {
-          await connection.rollback();
-          connection.release();
-          throw error;
-        }
+        return NextResponse.json({
+          success: true,
+          message: `Ordinamento alfabetico completato`,
+          count: sorted.length,
+        });
       }
 
       case "sortByPoints": {
-        const [rows] = await pool.execute<PlayerRow[]>(
-          `SELECT * FROM ${tableName}`
-        );
+        const rows = await db.select().from(table);
 
         const sorted = sortRanking(
-          rows.map((row) => ({
+          rows.map((row: any) => ({
             id: row.id,
-            total_points: row.total_points ?? 0,
+            total_points: Number(row.totalPoints ?? row.pointsAwarded ?? 0),
             t1: row.t1 ?? 0,
           }))
         );
 
-        const connection = await pool.getConnection();
-        await connection.beginTransaction();
-
-        try {
+        await db.transaction(async (tx) => {
           for (let i = 0; i < sorted.length; i++) {
-            await connection.execute(
-              `UPDATE ${tableName} SET position = ? WHERE id = ?`,
-              [i + 1, sorted[i].id]
-            );
+            await tx
+              .update(table)
+              .set({ position: i + 1 })
+              .where(eq(table.id, sorted[i].id));
           }
-          await connection.commit();
-          connection.release();
+        });
 
-          return NextResponse.json({
-            success: true,
-            message: `Ordinamento per punti completato`,
-            count: sorted.length,
-          });
-        } catch (error) {
-          await connection.rollback();
-          connection.release();
-          throw error;
-        }
+        return NextResponse.json({
+          success: true,
+          message: `Ordinamento per punti completato`,
+          count: sorted.length,
+        });
       }
 
       case "capitalizeNames": {
-        const [rows] = await pool.execute<RowDataPacket[]>(
-          `SELECT id, name FROM ${tableName}`
-        );
+        const rows = await db.select({ id: table.id, name: table.name }).from(table);
 
-        const connection = await pool.getConnection();
-        await connection.beginTransaction();
-
-        try {
-          let updated = 0;
+        let updated = 0;
+        await db.transaction(async (tx) => {
           for (const row of rows) {
             const capitalizedName = capitalizeName(row.name as string);
             if (capitalizedName !== row.name) {
-              await connection.execute(
-                `UPDATE ${tableName} SET name = ? WHERE id = ?`,
-                [capitalizedName, row.id]
-              );
+              await tx
+                .update(table)
+                .set({ name: capitalizedName })
+                .where(eq(table.id, row.id));
               updated++;
             }
           }
-          await connection.commit();
-          connection.release();
+        });
 
-          return NextResponse.json({
-            success: true,
-            message: `${updated} nomi capitalizzati`,
-            updated,
-          });
-        } catch (error) {
-          await connection.rollback();
-          connection.release();
-          throw error;
-        }
+        return NextResponse.json({
+          success: true,
+          message: `${updated} nomi capitalizzati`,
+          updated,
+        });
       }
 
       case "recalculatePositions": {
-        const [rows] = await pool.execute<PlayerRow[]>(
-          `SELECT id, total_points, t1 FROM ${tableName}`
-        );
+        const rows = await db.select().from(table);
 
         const sorted = sortRanking(
-          rows.map((row) => ({
+          rows.map((row: any) => ({
             id: row.id,
-            total_points: row.total_points ?? 0,
+            total_points: Number(row.totalPoints ?? row.pointsAwarded ?? 0),
             t1: row.t1 ?? 0,
           }))
         );
 
-        const connection = await pool.getConnection();
-        await connection.beginTransaction();
-
-        try {
+        await db.transaction(async (tx) => {
           for (let i = 0; i < sorted.length; i++) {
-            await connection.execute(
-              `UPDATE ${tableName} SET position = ? WHERE id = ?`,
-              [i + 1, sorted[i].id]
-            );
+            await tx
+              .update(table)
+              .set({ position: i + 1 })
+              .where(eq(table.id, sorted[i].id));
           }
-          await connection.commit();
-          connection.release();
+        });
 
-          return NextResponse.json({
-            success: true,
-            message: `Posizioni ricalcolate`,
-            count: sorted.length,
-          });
-        } catch (error) {
-          await connection.rollback();
-          connection.release();
-          throw error;
-        }
+        return NextResponse.json({
+          success: true,
+          message: `Posizioni ricalcolate`,
+          count: sorted.length,
+        });
       }
 
       case "multiplyScores": {
@@ -197,14 +147,14 @@ export async function POST(request: Request) {
           );
         }
 
-        const [result] = await pool.execute<ResultSetHeader>(
-          `UPDATE stage_ranking SET score = score * 3 WHERE score IS NOT NULL`
-        );
+        await db
+          .update(stageRanking)
+          .set({ score: sql`${stageRanking.score} * 3` })
+          .where(sql`${stageRanking.score} IS NOT NULL`);
 
         return NextResponse.json({
           success: true,
-          message: `${result.affectedRows} punteggi moltiplicati per 3`,
-          affectedRows: result.affectedRows,
+          message: `Punteggi moltiplicati per 3`,
         });
       }
 

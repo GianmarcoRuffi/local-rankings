@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import { db } from "@/lib/db";
+import { rankings, generalRanking, stages } from "@/lib/db/schema";
+import { eq, and, ne } from "drizzle-orm";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const rankingId = parseInt(id);
 
   try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM rankings WHERE id = ?",
-      [id]
-    );
+    const rows = await db
+      .select()
+      .from(rankings)
+      .where(eq(rankings.id, rankingId))
+      .limit(1);
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "Ranking not found" }, { status: 404 });
@@ -40,45 +43,42 @@ export async function PUT(
   }
 
   const { id } = await params;
+  const rankingId = parseInt(id);
   const body = await request.json();
   const { name, description, is_default } = body;
 
   try {
-    const [existing] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM rankings WHERE id = ?",
-      [id]
-    );
+    const existing = await db
+      .select()
+      .from(rankings)
+      .where(eq(rankings.id, rankingId))
+      .limit(1);
 
     if (existing.length === 0) {
       return NextResponse.json({ error: "Ranking not found" }, { status: 404 });
     }
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
+    await db.transaction(async (tx) => {
       // If this is set as default, remove default from other rankings
       if (is_default) {
-        await connection.execute(
-          "UPDATE rankings SET is_default = 0 WHERE is_default = 1 AND id != ?",
-          [id]
-        );
+        await tx
+          .update(rankings)
+          .set({ isDefault: false })
+          .where(and(eq(rankings.isDefault, true), ne(rankings.id, rankingId)));
       }
 
-      await connection.execute(
-        "UPDATE rankings SET name = ?, description = ?, is_default = ?, updated_at = NOW() WHERE id = ?",
-        [name?.trim(), description?.trim() || null, is_default ? 1 : 0, id]
-      );
+      await tx
+        .update(rankings)
+        .set({
+          name: name?.trim(),
+          description: description?.trim() || null,
+          isDefault: !!is_default,
+          updatedAt: new Date(),
+        })
+        .where(eq(rankings.id, rankingId));
+    });
 
-      await connection.commit();
-      connection.release();
-
-      return NextResponse.json({ success: true });
-    } catch (error) {
-      await connection.rollback();
-      connection.release();
-      throw error;
-    }
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating ranking:", error);
     return NextResponse.json(
@@ -98,55 +98,46 @@ export async function DELETE(
   }
 
   const { id } = await params;
+  const rankingId = parseInt(id);
 
   try {
-    const [existing] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM rankings WHERE id = ?",
-      [id]
-    );
+    const existing = await db
+      .select()
+      .from(rankings)
+      .where(eq(rankings.id, rankingId))
+      .limit(1);
 
     if (existing.length === 0) {
       return NextResponse.json({ error: "Ranking not found" }, { status: 404 });
     }
 
-    if (existing[0].is_default) {
+    if (existing[0].isDefault) {
       return NextResponse.json(
         { error: "Cannot delete the default ranking" },
         { status: 400 }
       );
     }
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
+    await db.transaction(async (tx) => {
       // Delete all general ranking entries for this ranking
-      await connection.execute(
-        "DELETE FROM general_ranking WHERE ranking_id = ?",
-        [id]
-      );
+      await tx
+        .delete(generalRanking)
+        .where(eq(generalRanking.rankingId, rankingId));
 
       // Set ranking_id to NULL for stages linked to this ranking
-      await connection.execute(
-        "UPDATE stages SET ranking_id = NULL WHERE ranking_id = ?",
-        [id]
-      );
+      await tx
+        .update(stages)
+        .set({ rankingId: null })
+        .where(eq(stages.rankingId, rankingId));
 
       // Delete the ranking
-      await connection.execute("DELETE FROM rankings WHERE id = ?", [id]);
+      await tx.delete(rankings).where(eq(rankings.id, rankingId));
+    });
 
-      await connection.commit();
-      connection.release();
-
-      return NextResponse.json({
-        success: true,
-        message: "Ranking deleted successfully",
-      });
-    } catch (error) {
-      await connection.rollback();
-      connection.release();
-      throw error;
-    }
+    return NextResponse.json({
+      success: true,
+      message: "Ranking deleted successfully",
+    });
   } catch (error) {
     console.error("Error deleting ranking:", error);
     return NextResponse.json(

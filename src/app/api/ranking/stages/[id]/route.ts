@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import { db } from "@/lib/db";
+import { stages, stageRanking } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function PUT(
   request: Request,
@@ -14,14 +15,16 @@ export async function PUT(
   }
 
   const { id } = await params;
+  const stageId = parseInt(id);
   const body = await request.json();
   const { name, date, ranking_id } = body;
 
   try {
-    const [stageRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT status FROM stages WHERE id = ?",
-      [id]
-    );
+    const stageRows = await db
+      .select({ status: stages.status })
+      .from(stages)
+      .where(eq(stages.id, stageId))
+      .limit(1);
 
     if (stageRows.length === 0) {
       return NextResponse.json({ error: "Stage not found" }, { status: 404 });
@@ -34,10 +37,15 @@ export async function PUT(
       );
     }
 
-    await pool.execute(
-      "UPDATE stages SET name = ?, date = ?, ranking_id = ? WHERE id = ?",
-      [name, date || null, ranking_id || null, id]
-    );
+    await db
+      .update(stages)
+      .set({
+        name,
+        date: date ? new Date(date).toISOString().split('T')[0] : null,
+        rankingId: ranking_id ? parseInt(ranking_id) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(stages.id, stageId));
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -51,12 +59,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const stageId = parseInt(id);
 
   try {
-    const [players] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM stage_ranking WHERE stage_id = ? ORDER BY position ASC",
-      [id]
-    );
+    const players = await db
+      .select()
+      .from(stageRanking)
+      .where(eq(stageRanking.stageId, stageId))
+      .orderBy(stageRanking.position);
     return NextResponse.json(players);
   } catch (error) {
     console.error("Error fetching stage ranking:", error);
@@ -77,29 +87,23 @@ export async function DELETE(
   }
 
   const { id } = await params;
+  const stageId = parseInt(id);
 
   try {
-    const [stageRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM stages WHERE id = ?",
-      [id]
-    );
+    const stageRows = await db
+      .select()
+      .from(stages)
+      .where(eq(stages.id, stageId))
+      .limit(1);
 
     if (stageRows.length === 0) {
       return NextResponse.json({ error: "Stage not found" }, { status: 404 });
     }
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-    try {
-      await connection.execute("DELETE FROM stage_ranking WHERE stage_id = ?", [id]);
-      await connection.execute("DELETE FROM stages WHERE id = ?", [id]);
-      await connection.commit();
-      connection.release();
-    } catch (err) {
-      await connection.rollback();
-      connection.release();
-      throw err;
-    }
+    await db.transaction(async (tx) => {
+      await tx.delete(stageRanking).where(eq(stageRanking.stageId, stageId));
+      await tx.delete(stages).where(eq(stages.id, stageId));
+    });
 
     return NextResponse.json({ success: true, message: "Tappa eliminata" });
   } catch (error) {

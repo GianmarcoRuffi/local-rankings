@@ -2,14 +2,9 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import bcrypt from "bcryptjs";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
-
-interface UserRow extends RowDataPacket {
-  id: number;
-  password_hash: string;
-  username: string;
-}
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -39,17 +34,19 @@ export async function POST(request: Request) {
     if (!username) {
       return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
     }
-    const [rows] = await pool.execute<UserRow[]>(
-      "SELECT id, password_hash, username FROM users WHERE username = ?",
-      [username]
-    );
+    
+    const rows = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
     }
 
     const user = rows[0];
-    const isValid = await bcrypt.compare(currentPassword, user.password_hash);
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
 
     if (!isValid) {
       return NextResponse.json(
@@ -59,10 +56,10 @@ export async function POST(request: Request) {
     }
 
     const newHash = await bcrypt.hash(newPassword, 12);
-    await pool.execute("UPDATE users SET password_hash = ? WHERE id = ?", [
-      newHash,
-      user.id,
-    ]);
+    await db
+      .update(users)
+      .set({ passwordHash: newHash, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
 
     return NextResponse.json({ success: true });
   } catch (error) {

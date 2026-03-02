@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket, ResultSetHeader } from "mysql2";
+import { db } from "@/lib/db";
+import { rankings } from "@/lib/db/schema";
+import { eq, desc, asc } from "drizzle-orm";
 
 export async function GET() {
   try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM rankings ORDER BY is_default DESC, name ASC"
-    );
+    const rows = await db
+      .select()
+      .from(rankings)
+      .orderBy(desc(rankings.isDefault), asc(rankings.name));
     return NextResponse.json(rows);
   } catch (error) {
     console.error("Error fetching rankings:", error);
@@ -36,36 +38,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
+    const result = await db.transaction(async (tx) => {
       // If this is set as default, remove default from other rankings
       if (is_default) {
-        await connection.execute(
-          "UPDATE rankings SET is_default = 0 WHERE is_default = 1"
-        );
+        await tx
+          .update(rankings)
+          .set({ isDefault: false })
+          .where(eq(rankings.isDefault, true));
       }
 
-      const [result] = await connection.execute<ResultSetHeader>(
-        "INSERT INTO rankings (name, description, is_default) VALUES (?, ?, ?)",
-        [name.trim(), description?.trim() || null, is_default ? 1 : 0]
-      );
+      const [inserted] = await tx
+        .insert(rankings)
+        .values({
+          name: name.trim(),
+          description: description?.trim() || null,
+          isDefault: !!is_default,
+        })
+        .returning();
 
-      await connection.commit();
-      connection.release();
+      return inserted;
+    });
 
-      return NextResponse.json({
-        id: result.insertId,
-        name: name.trim(),
-        description: description?.trim() || null,
-        is_default: !!is_default,
-      });
-    } catch (error) {
-      await connection.rollback();
-      connection.release();
-      throw error;
-    }
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error creating ranking:", error);
     return NextResponse.json(

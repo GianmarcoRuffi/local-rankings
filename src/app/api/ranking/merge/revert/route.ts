@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import { db } from "@/lib/db";
+import { stages, rankings, stageRanking, generalRanking } from "@/lib/db/schema";
+import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
 
 export async function POST(request: Request) {
@@ -19,10 +20,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const [stageRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM stages WHERE id = ?",
-      [stageId]
-    );
+    const stageRows = await db
+      .select()
+      .from(stages)
+      .where(eq(stages.id, parseInt(stageId)))
+      .limit(1);
 
     if (stageRows.length === 0) {
       return NextResponse.json({ error: "Stage not found" }, { status: 404 });
@@ -35,90 +37,107 @@ export async function POST(request: Request) {
     }
 
     // Get the ranking_id from the stage
-    let rankingId = stage.ranking_id;
+    let rankingId = stage.rankingId;
     if (!rankingId) {
-      const [defaultRanking] = await pool.execute<RowDataPacket[]>(
-        "SELECT id FROM rankings WHERE is_default = 1 LIMIT 1"
-      );
+      const defaultRanking = await db
+        .select({ id: rankings.id })
+        .from(rankings)
+        .where(eq(rankings.isDefault, true))
+        .limit(1);
       if (defaultRanking.length > 0) {
         rankingId = defaultRanking[0].id;
       }
     }
 
-    const [stagePlayers] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM stage_ranking WHERE stage_id = ? ORDER BY position ASC",
-      [stageId]
-    );
+    const stagePlayers = await db
+      .select()
+      .from(stageRanking)
+      .where(eq(stageRanking.stageId, parseInt(stageId)))
+      .orderBy(stageRanking.position);
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
+    await db.transaction(async (tx) => {
       for (const player of stagePlayers) {
-        const [existing] = await connection.execute<RowDataPacket[]>(
-          "SELECT id, total_points, t1, presenze FROM general_ranking WHERE LOWER(name) = LOWER(?) AND (ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1)))",
-          [player.name, rankingId, rankingId]
-        );
+        const existing = await tx
+          .select()
+          .from(generalRanking)
+          .where(
+            and(
+              sql`LOWER(${generalRanking.name}) = LOWER(${player.name})`,
+              or(
+                eq(generalRanking.rankingId, rankingId!),
+                and(
+                  isNull(generalRanking.rankingId),
+                  sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
+                )
+              )
+            )
+          )
+          .limit(1);
 
         if (existing.length > 0) {
           const current = existing[0];
-          const newPoints = current.total_points - (player.points_awarded || 0);
+          const newPoints = current.totalPoints - (player.pointsAwarded || 0);
           const newT1 = (current.t1 || 0) - (player.t1 || 0);
           const newPresenze = (current.presenze || 0) - (player.presenze || 1);
 
           if (newPoints <= 0 && newT1 === 0 && newPresenze <= 0) {
-            await connection.execute(
-              "DELETE FROM general_ranking WHERE id = ?",
-              [current.id]
-            );
+            await tx
+              .delete(generalRanking)
+              .where(eq(generalRanking.id, current.id));
           } else {
-            await connection.execute(
-              "UPDATE general_ranking SET total_points = ?, t1 = ?, presenze = ?, updated_at = NOW() WHERE id = ?",
-              [Math.max(0, newPoints), newT1, Math.max(0, newPresenze), current.id]
-            );
+            await tx
+              .update(generalRanking)
+              .set({
+                totalPoints: Math.max(0, newPoints),
+                t1: newT1,
+                presenze: Math.max(0, newPresenze),
+                updatedAt: new Date(),
+              })
+              .where(eq(generalRanking.id, current.id));
           }
         }
       }
 
-      await connection.execute(
-        "UPDATE stages SET status = 'active', updated_at = NOW() WHERE id = ?",
-        [stageId]
-      );
+      await tx
+        .update(stages)
+        .set({ status: "active", updatedAt: new Date() })
+        .where(eq(stages.id, parseInt(stageId)));
 
-      const [allPlayers] = await connection.execute<RowDataPacket[]>(
-        "SELECT id, total_points, t1 FROM general_ranking WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))",
-        [rankingId, rankingId]
-      );
+      const allPlayers = await tx
+        .select({ id: generalRanking.id, totalPoints: generalRanking.totalPoints, t1: generalRanking.t1 })
+        .from(generalRanking)
+        .where(
+          or(
+            eq(generalRanking.rankingId, rankingId!),
+            and(
+              isNull(generalRanking.rankingId),
+              sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
+            )
+          )
+        );
 
       if (allPlayers.length > 0) {
         const sorted = sortRanking(
           allPlayers.map((p) => ({
             id: p.id,
-            total_points: p.total_points,
+            total_points: p.totalPoints,
             t1: p.t1 || 0,
           }))
         );
 
         for (let i = 0; i < sorted.length; i++) {
-          await connection.execute(
-            "UPDATE general_ranking SET position = ? WHERE id = ?",
-            [i + 1, sorted[i].id]
-          );
+          await tx
+            .update(generalRanking)
+            .set({ position: i + 1 })
+            .where(eq(generalRanking.id, sorted[i].id));
         }
       }
+    });
 
-      await connection.commit();
-      connection.release();
-
-      return NextResponse.json({
-        success: true,
-        message: `Merge della tappa "${stage.name}" annullato`,
-      });
-    } catch (error) {
-      await connection.rollback();
-      connection.release();
-      throw error;
-    }
+    return NextResponse.json({
+      success: true,
+      message: `Merge della tappa "${stage.name}" annullato`,
+    });
   } catch (error) {
     console.error("Error reverting merge:", error);
     return NextResponse.json({ error: "Failed to revert merge" }, { status: 500 });

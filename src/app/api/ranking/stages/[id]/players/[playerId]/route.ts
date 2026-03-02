@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import { db } from "@/lib/db";
+import { stages, stageRanking } from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 export async function PATCH(
   request: Request,
@@ -14,14 +15,20 @@ export async function PATCH(
   }
 
   const { playerId } = await params;
+  const id = parseInt(playerId);
   const body = await request.json();
   const { name, points_awarded, t1, presenze } = body;
 
   try {
-    await pool.execute(
-      "UPDATE stage_ranking SET name = ?, points_awarded = ?, t1 = ?, presenze = ? WHERE id = ?",
-      [name, points_awarded, t1, presenze, playerId]
-    );
+    await db
+      .update(stageRanking)
+      .set({
+        name,
+        pointsAwarded: points_awarded,
+        t1,
+        presenze,
+      })
+      .where(eq(stageRanking.id, id));
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -39,13 +46,16 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, playerId } = await params;
+  const { id: stageIdStr, playerId: playerIdStr } = await params;
+  const stageId = parseInt(stageIdStr);
+  const playerId = parseInt(playerIdStr);
 
   try {
-    const [stageRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT status FROM stages WHERE id = ?",
-      [id]
-    );
+    const stageRows = await db
+      .select({ status: stages.status })
+      .from(stages)
+      .where(eq(stages.id, stageId))
+      .limit(1);
 
     if (stageRows.length === 0) {
       return NextResponse.json({ error: "Stage not found" }, { status: 404 });
@@ -58,33 +68,24 @@ export async function DELETE(
       );
     }
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-    try {
-      await connection.execute(
-        "DELETE FROM stage_ranking WHERE id = ? AND stage_id = ?",
-        [playerId, id]
-      );
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(stageRanking)
+        .where(and(eq(stageRanking.id, playerId), eq(stageRanking.stageId, stageId)));
 
-      const [remaining] = await connection.execute<RowDataPacket[]>(
-        "SELECT id FROM stage_ranking WHERE stage_id = ? ORDER BY points_awarded DESC, t1 DESC",
-        [id]
-      );
+      const remaining = await tx
+        .select({ id: stageRanking.id })
+        .from(stageRanking)
+        .where(eq(stageRanking.stageId, stageId))
+        .orderBy(desc(stageRanking.pointsAwarded), desc(stageRanking.t1));
 
       for (let i = 0; i < remaining.length; i++) {
-        await connection.execute(
-          "UPDATE stage_ranking SET position = ? WHERE id = ?",
-          [i + 1, remaining[i].id]
-        );
+        await tx
+          .update(stageRanking)
+          .set({ position: i + 1 })
+          .where(eq(stageRanking.id, remaining[i].id));
       }
-
-      await connection.commit();
-      connection.release();
-    } catch (err) {
-      await connection.rollback();
-      connection.release();
-      throw err;
-    }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

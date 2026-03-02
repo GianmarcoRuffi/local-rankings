@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import { db } from "@/lib/db";
+import { generalRanking, rankings } from "@/lib/db/schema";
+import { eq, or, and, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
 
 export async function PATCH(
@@ -15,62 +16,70 @@ export async function PATCH(
   }
 
   const { id } = await params;
+  const playerId = parseInt(id);
   const body = await request.json();
   const { name, total_points, t1, presenze, ranking_id } = body;
 
   try {
     // Get the ranking_id from the player if not provided
-    let effectiveRankingId = ranking_id;
+    let effectiveRankingId = ranking_id ? parseInt(ranking_id) : null;
     if (!effectiveRankingId) {
-      const [playerRow] = await pool.execute<RowDataPacket[]>(
-        "SELECT ranking_id FROM general_ranking WHERE id = ?",
-        [id]
-      );
+      const playerRow = await db
+        .select({ rankingId: generalRanking.rankingId })
+        .from(generalRanking)
+        .where(eq(generalRanking.id, playerId))
+        .limit(1);
       if (playerRow.length > 0) {
-        effectiveRankingId = playerRow[0].ranking_id;
+        effectiveRankingId = playerRow[0].rankingId;
       }
     }
 
-    await pool.execute(
-      "UPDATE general_ranking SET name = ?, total_points = ?, t1 = ?, presenze = ?, updated_at = NOW() WHERE id = ?",
-      [name, total_points, t1, presenze, id]
-    );
+    await db
+      .update(generalRanking)
+      .set({
+        name,
+        totalPoints: total_points,
+        t1,
+        presenze,
+        updatedAt: new Date(),
+      })
+      .where(eq(generalRanking.id, playerId));
 
     // Fetch all players in the same ranking
-    let query = "SELECT id, total_points, t1 FROM general_ranking";
-    const queryParams: (number | null)[] = [];
+    let query = db
+      .select({ id: generalRanking.id, totalPoints: generalRanking.totalPoints, t1: generalRanking.t1 })
+      .from(generalRanking);
     
     if (effectiveRankingId) {
-      query += " WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))";
-      queryParams.push(effectiveRankingId, effectiveRankingId);
+      query.where(
+        or(
+          eq(generalRanking.rankingId, effectiveRankingId),
+          and(
+            isNull(generalRanking.rankingId),
+            sql`${effectiveRankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
+          )
+        )
+      );
     }
 
-    const [allPlayers] = await pool.execute<RowDataPacket[]>(query, queryParams);
+    const allPlayers = await query;
 
     const sorted = sortRanking(
       allPlayers.map((p) => ({
         id: p.id,
-        total_points: p.total_points,
+        total_points: p.totalPoints,
         t1: p.t1 || 0,
       }))
     );
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-    try {
+    await db.transaction(async (tx) => {
       for (let i = 0; i < sorted.length; i++) {
-        await connection.execute(
-          "UPDATE general_ranking SET position = ? WHERE id = ?",
-          [i + 1, sorted[i].id]
-        );
+        await tx
+          .update(generalRanking)
+          .set({ position: i + 1 })
+          .where(eq(generalRanking.id, sorted[i].id));
       }
-      await connection.commit();
-      connection.release();
-    } catch (err) {
-      await connection.rollback();
-      connection.release();
-      throw err;
-    }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,20 +1,23 @@
 import {
-  mysqlTable,
-  int,
+  pgTable,
+  serial,
   varchar,
   text,
   timestamp,
   date,
-  mysqlEnum,
+  pgEnum,
   decimal,
   boolean,
   index,
-} from "drizzle-orm/mysql-core";
+  integer,
+} from "drizzle-orm/pg-core";
 
-export const users = mysqlTable(
+export const statusEnum = pgEnum("status", ["pending", "active", "merged"]);
+
+export const users = pgTable(
   "users",
   {
-    id: int().autoincrement().primaryKey(),
+    id: serial().primaryKey(),
     username: varchar({ length: 100 }).notNull().unique(),
     passwordHash: varchar("password_hash", { length: 255 }).notNull(),
     displayName: varchar("display_name", { length: 150 }).notNull(),
@@ -27,10 +30,10 @@ export const users = mysqlTable(
   (table) => [index("idx_username").on(table.username)]
 );
 
-export const rankings = mysqlTable(
+export const rankings = pgTable(
   "rankings",
   {
-    id: int().autoincrement().primaryKey(),
+    id: serial().primaryKey(),
     name: varchar({ length: 200 }).notNull().unique(),
     description: text(),
     isDefault: boolean("is_default").notNull().default(false),
@@ -43,17 +46,15 @@ export const rankings = mysqlTable(
   (table) => [index("idx_is_default").on(table.isDefault)]
 );
 
-export const stages = mysqlTable(
+export const stages = pgTable(
   "stages",
   {
-    id: int().autoincrement().primaryKey(),
-    rankingId: int("ranking_id"),
+    id: serial().primaryKey(),
+    rankingId: integer("ranking_id"),
     name: varchar({ length: 200 }).notNull(),
     date: date(),
     pdfFilename: varchar("pdf_filename", { length: 255 }),
-    status: mysqlEnum("status", ["pending", "active", "merged"])
-      .notNull()
-      .default("pending"),
+    status: statusEnum("status").notNull().default("pending"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -67,35 +68,35 @@ export const stages = mysqlTable(
   ]
 );
 
-export const stageRanking = mysqlTable(
+export const stageRanking = pgTable(
   "stage_ranking",
   {
-    id: int().autoincrement().primaryKey(),
-    stageId: int("stage_id").notNull(),
-    position: int().notNull(),
+    id: serial().primaryKey(),
+    stageId: integer("stage_id").notNull(),
+    position: integer().notNull(),
     name: varchar({ length: 200 }).notNull(),
     score: decimal({ precision: 10, scale: 3 }),
-    pointsAwarded: int("points_awarded").notNull().default(0),
-    t1: int().default(0),
-    presenze: int().notNull().default(1),
+    pointsAwarded: integer("points_awarded").notNull().default(0),
+    t1: integer().default(0),
+    presenze: integer().notNull().default(1),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     index("idx_stage_id").on(table.stageId),
-    index("idx_position").on(table.position),
+    index("idx_stage_position").on(table.position),
   ]
 );
 
-export const generalRanking = mysqlTable(
+export const generalRanking = pgTable(
   "general_ranking",
   {
-    id: int().autoincrement().primaryKey(),
-    rankingId: int("ranking_id"),
-    position: int().default(0),
+    id: serial().primaryKey(),
+    rankingId: integer("ranking_id"),
+    position: integer().default(0),
     name: varchar({ length: 200 }).notNull(),
-    totalPoints: int("total_points").notNull().default(0),
-    t1: int().default(0),
-    presenze: int().notNull().default(0),
+    totalPoints: integer("total_points").notNull().default(0),
+    t1: integer().default(0),
+    presenze: integer().notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -105,7 +106,7 @@ export const generalRanking = mysqlTable(
   (table) => [
     index("idx_total_points").on(table.totalPoints),
     index("idx_name").on(table.name),
-    index("idx_position").on(table.position),
+    index("idx_general_position").on(table.position),
     index("idx_gr_ranking_id").on(table.rankingId),
   ]
 );

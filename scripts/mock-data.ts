@@ -108,10 +108,10 @@ async function seed() {
       .insert(stages)
       .values({
         name: stageData.name,
-        date: new Date(stageData.date),
+        date: new Date(stageData.date).toISOString().split('T')[0],
         status: i < mockStages.length - 1 ? 'merged' : 'active',
       })
-      .$returningId();
+      .returning({ id: stages.id });
 
     const stageId = result[0].id;
 

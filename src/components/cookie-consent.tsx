@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
 
 export function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
@@ -20,10 +19,6 @@ export function CookieConsent() {
     setIsVisible(false);
   };
 
-  const handleClose = () => {
-    setIsVisible(false);
-  };
-
   if (!isVisible) return null;
 
   return (
@@ -33,14 +28,9 @@ export function CookieConsent() {
           Navigando su questo sito accetti l'utilizzo di cookie per migliorare
           l'esperienza utente e analizzare il traffico.
         </p>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" onClick={handleClose}>
-            <X className="h-4 w-4" />
-          </Button>
-          <Button variant="default" size="sm" onClick={handleAccept}>
-            Accetto
-          </Button>
-        </div>
+        <Button variant="default" size="sm" onClick={handleAccept} className="flex-shrink-0">
+          Accetto
+        </Button>
       </div>
     </div>
   );

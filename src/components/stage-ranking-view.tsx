@@ -159,6 +159,9 @@ export function StageRankingView() {
     date: "",
   });
   const [savingStage, setSavingStage] = useState(false);
+  const [confirmEditDialogOpen, setConfirmEditDialogOpen] = useState(false);
+  const [playerToConfirmEdit, setPlayerToConfirmEdit] =
+    useState<StageRankingPlayer | null>(null);
 
   const fetchStages = useCallback(async () => {
     if (!selectedRanking) return;
@@ -730,7 +733,10 @@ export function StageRankingView() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-8 w-8 p-0 text-green-600"
-                                onClick={() => saveEdit(player)}
+                                onClick={() => {
+                                  setPlayerToConfirmEdit(player);
+                                  setConfirmEditDialogOpen(true);
+                                }}
                                 disabled={saving}
                               >
                                 <Check className="h-4 w-4" />
@@ -881,6 +887,53 @@ export function StageRankingView() {
                 <>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Sì, elimina
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmEditDialogOpen}
+        onOpenChange={setConfirmEditDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conferma modifica</DialogTitle>
+            <DialogDescription>
+              Stai per modificare i record del giocatore{" "}
+              <strong>&quot;{playerToConfirmEdit?.name}&quot;</strong>. Vuoi
+              procedere?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmEditDialogOpen(false)}
+              disabled={saving}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                if (playerToConfirmEdit) {
+                  saveEdit(playerToConfirmEdit);
+                  setConfirmEditDialogOpen(false);
+                }
+              }}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Sì, modifica
                 </>
               )}
             </Button>

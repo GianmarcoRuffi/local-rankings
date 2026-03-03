@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
 import { Ranking } from "@/types/ranking";
 
 interface RankingContextType {
@@ -25,7 +32,7 @@ export function RankingProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data: Ranking[] = await res.json();
         setRankings(data);
-        
+
         // Set default ranking or first one
         if (data.length > 0 && !selectedRanking) {
           const defaultRanking = data.find((r) => r.is_default) || data[0];
@@ -52,9 +59,25 @@ export function RankingProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Restore selected ranking from localStorage on mount
+  // Check URL params and localStorage on mount
   useEffect(() => {
     if (rankings.length > 0 && !selectedRanking) {
+      // Check URL param for ranking ID
+      const params = new URLSearchParams(window.location.search);
+      const rankingIdParam = params.get("rankingId");
+
+      if (rankingIdParam) {
+        const foundRanking = rankings.find(
+          (r) => String(r.id) === rankingIdParam,
+        );
+        if (foundRanking) {
+          setSelectedRanking(foundRanking);
+          localStorage.setItem("selectedRankingId", String(foundRanking.id));
+          return;
+        }
+      }
+
+      // Restore from localStorage
       const storedId = localStorage.getItem("selectedRankingId");
       if (storedId) {
         const found = rankings.find((r) => String(r.id) === storedId);
@@ -63,6 +86,8 @@ export function RankingProvider({ children }: { children: ReactNode }) {
           return;
         }
       }
+
+      // Default fallback
       const defaultRanking = rankings.find((r) => r.is_default) || rankings[0];
       setSelectedRanking(defaultRanking);
     }

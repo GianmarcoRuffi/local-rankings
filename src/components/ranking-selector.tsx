@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { Plus, Trash2, Pencil, Trophy, List } from "lucide-react";
+import { Plus, Trash2, Pencil, Trophy, List, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +32,8 @@ interface RankingSelectorProps {
 export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
   const { data: session } = useSession();
   const isAuthenticated = !!session;
-  const { rankings, selectedRanking, setSelectedRanking, refreshRankings } = useRanking();
+  const { rankings, selectedRanking, setSelectedRanking, refreshRankings } =
+    useRanking();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -53,7 +54,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
 
   const handleCreate = async () => {
     if (!newName.trim()) {
-      toast({ title: "Errore", description: "Il nome è obbligatorio", variant: "destructive" });
+      toast({
+        title: "Errore",
+        description: "Il nome è obbligatorio",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -81,7 +86,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
         await refreshRankings();
       } else {
         const data = await res.json();
-        toast({ title: "Errore", description: data.error, variant: "destructive" });
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
       }
     } finally {
       setSaving(false);
@@ -90,7 +99,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
 
   const handleEdit = async () => {
     if (!rankingToEdit || !newName.trim()) {
-      toast({ title: "Errore", description: "Il nome è obbligatorio", variant: "destructive" });
+      toast({
+        title: "Errore",
+        description: "Il nome è obbligatorio",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -119,7 +132,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
         await refreshRankings();
       } else {
         const data = await res.json();
-        toast({ title: "Errore", description: data.error, variant: "destructive" });
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
       }
     } finally {
       setSaving(false);
@@ -146,7 +163,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
         await refreshRankings();
       } else {
         const data = await res.json();
-        toast({ title: "Errore", description: data.error, variant: "destructive" });
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
       }
     } finally {
       setDeleting(false);
@@ -163,6 +184,28 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
   const openDeleteDialog = (ranking: Ranking) => {
     setRankingToDelete(ranking);
     setDeleteDialogOpen(true);
+  };
+
+  const handleCopyShareLink = async () => {
+    if (!selectedRanking) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("rankingId", String(selectedRanking.id));
+
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      toast({
+        title: "Link copiato",
+        description: "Il link della classifica è stato copiato negli appunti.",
+        variant: "success" as Parameters<typeof toast>[0]["variant"],
+      });
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: "Non è stato possibile copiare il link.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -184,7 +227,9 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
                 <div className="flex items-center gap-2">
                   <span>{ranking.name}</span>
                   {ranking.is_default && (
-                    <Badge variant="secondary" className="text-xs">Default</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      Default
+                    </Badge>
                   )}
                 </div>
               </SelectItem>
@@ -209,6 +254,14 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
 
             {selectedRanking && (
               <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCopyShareLink}
+                  title="Copia link della classifica"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -243,7 +296,8 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
               Nuova Classifica
             </DialogTitle>
             <DialogDescription>
-              Crea una nuova classifica generale. Ogni classifica ha le proprie tappe e classifica cumulativa indipendente.
+              Crea una nuova classifica generale. Ogni classifica ha le proprie
+              tappe e classifica cumulativa indipendente.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -267,7 +321,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={saving}>
+            <Button
+              variant="outline"
+              onClick={() => setCreateDialogOpen(false)}
+              disabled={saving}
+            >
               Annulla
             </Button>
             <Button onClick={handleCreate} disabled={saving}>
@@ -308,7 +366,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={saving}>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={saving}
+            >
               Annulla
             </Button>
             <Button onClick={handleEdit} disabled={saving}>
@@ -327,16 +389,26 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
               Eliminare la classifica?
             </DialogTitle>
             <DialogDescription>
-              Stai per eliminare la classifica <strong>&quot;{rankingToDelete?.name}&quot;</strong>.
-              Questa operazione è <strong>irreversibile</strong>: tutti i dati della classifica generale
-              verranno eliminati. Le tappe associate verranno scollegate ma non eliminate.
+              Stai per eliminare la classifica{" "}
+              <strong>&quot;{rankingToDelete?.name}&quot;</strong>. Questa
+              operazione è <strong>irreversibile</strong>: tutti i dati della
+              classifica generale verranno eliminati. Le tappe associate
+              verranno scollegate ma non eliminate.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+            >
               Annulla
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
               {deleting ? "Eliminazione..." : "Elimina"}
             </Button>
           </DialogFooter>

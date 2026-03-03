@@ -511,56 +511,61 @@ export function GeneralRankingTable() {
             {players.length} <span className="hidden xs:inline">giocatori</span>
           </Badge>
         </CardTitle>
-        {isAuthenticated && (
-          <div className="flex flex-wrap gap-1 sm:gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchPlayers}
-              disabled={loading}
-              className="h-8 px-2 sm:h-9 sm:px-3"
-              title="Aggiorna"
-            >
-              <RefreshCw
-                className={`h-4 w-4 sm:mr-2 ${loading ? "animate-spin" : ""}`}
-              />
-              <span className="hidden sm:inline">Aggiorna</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportToExcel}
-              disabled={loading || players.length === 0}
-              className="h-8 px-2 sm:h-9 sm:px-3"
-              title="Esporta Excel"
-            >
-              <Download className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Esporta Excel</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportToPDF}
-              disabled={loading || players.length === 0}
-              className="h-8 px-2 sm:h-9 sm:px-3"
-              title="Esporta PDF"
-            >
-              <FileText className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Esporta PDF</span>
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setResetDialogOpen(true)}
-              disabled={loading || players.length === 0}
-              className="h-8 px-2 sm:h-9 sm:px-3"
-              title="Reset classifica"
-            >
-              <Trash2 className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Reset</span>
-            </Button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
+          {/* Pulsanti Export - Pubblici */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToExcel}
+            disabled={loading || players.length === 0}
+            className="h-8 px-2 sm:h-9 sm:px-3"
+            title="Esporta Excel"
+          >
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Excel</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToPDF}
+            disabled={loading || players.length === 0}
+            className="h-8 px-2 sm:h-9 sm:px-3"
+            title="Esporta PDF"
+          >
+            <FileText className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">PDF</span>
+          </Button>
+
+          {/* Pulsanti Admin */}
+          {isAuthenticated && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchPlayers}
+                disabled={loading}
+                className="h-8 px-2 sm:h-9 sm:px-3"
+                title="Aggiorna"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 sm:mr-2 ${loading ? "animate-spin" : ""}`}
+                />
+                <span className="hidden sm:inline">Aggiorna</span>
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setResetDialogOpen(true)}
+                disabled={loading || players.length === 0}
+                className="h-8 px-2 sm:h-9 sm:px-3"
+                title="Reset classifica"
+              >
+                <Trash2 className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Reset</span>
+              </Button>
+            </>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Plus, Trash2, Pencil, Trophy, List, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,9 @@ interface RankingSelectorProps {
 }
 
 export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { data: session } = useSession();
   const isAuthenticated = !!session;
   const { rankings, selectedRanking, setSelectedRanking, refreshRankings } =
@@ -49,6 +53,11 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
     if (ranking) {
       setSelectedRanking(ranking);
       onRankingChange?.(ranking);
+
+      // Aggiorna URL con il nuovo rankingId
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("rankingId", rankingId);
+      router.push(`${pathname}?${params.toString()}`);
     }
   };
 
@@ -189,9 +198,8 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
   const handleCopyShareLink = async () => {
     if (!selectedRanking) return;
 
-    // Costruisci l'URL base senza query parameters
-    const baseUrl = `${window.location.origin}${window.location.pathname}`;
-    const url = new URL(baseUrl);
+    // Costruisci l'URL di condivisione con l'ID della classifica
+    const url = new URL(window.location.origin + "/dashboard");
     url.searchParams.set("rankingId", String(selectedRanking.id));
 
     try {

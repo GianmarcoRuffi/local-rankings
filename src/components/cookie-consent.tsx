@@ -28,7 +28,12 @@ export function CookieConsent() {
           Navigando su questo sito accetti l'utilizzo di cookie per migliorare
           l'esperienza utente e analizzare il traffico.
         </p>
-        <Button variant="default" size="sm" onClick={handleAccept} className="flex-shrink-0">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={handleAccept}
+          className="flex-shrink-0"
+        >
           Accetto
         </Button>
       </div>

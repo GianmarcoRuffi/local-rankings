@@ -189,7 +189,9 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
   const handleCopyShareLink = async () => {
     if (!selectedRanking) return;
 
-    const url = new URL(window.location.href);
+    // Costruisci l'URL base senza query parameters
+    const baseUrl = `${window.location.origin}${window.location.pathname}`;
+    const url = new URL(baseUrl);
     url.searchParams.set("rankingId", String(selectedRanking.id));
 
     try {

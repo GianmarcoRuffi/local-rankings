@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const rankingIdStr = searchParams.get("rankingId");
     const rankingId = rankingIdStr ? parseInt(rankingIdStr) : null;
 
-    let query = db.select().from(stages);
+    const query = db.select().from(stages);
 
     if (rankingId) {
       // WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))

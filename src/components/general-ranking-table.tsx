@@ -153,21 +153,6 @@ function T1Badge({ t1 }: { t1: number }) {
   );
 }
 
-function getPositionColor(position: number): string {
-  const colors: Record<number, string> = {
-    1: "#eab308",
-    2: "#9ca3af",
-    3: "#d97706",
-    4: "#2563eb",
-    5: "#3b82f6",
-    6: "#60a5fa",
-    7: "#a855f7",
-    8: "#c084fc",
-    9: "#6366f1",
-  };
-  return colors[position] || "#6b7280";
-}
-
 interface EditState {
   name: string;
   total_points: string;

@@ -209,7 +209,7 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
         description: "Il link della classifica è stato copiato negli appunti.",
         variant: "success" as Parameters<typeof toast>[0]["variant"],
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Errore",
         description: "Non è stato possibile copiare il link.",

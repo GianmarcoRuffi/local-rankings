@@ -7,7 +7,7 @@ export function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Controlla se l'utente ha già accettato i cookie
+    // Controlla se l'utente ha già accettato i cookie (in useEffect per evitare problemi di SSR)
     const cookieConsent = localStorage.getItem("cookieConsent");
     if (!cookieConsent) {
       setIsVisible(true);
@@ -25,8 +25,8 @@ export function CookieConsent() {
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border p-4 shadow-lg">
       <div className="container mx-auto flex items-center justify-between gap-4 max-w-7xl">
         <p className="text-sm text-muted-foreground">
-          Navigando su questo sito accetti l'utilizzo di cookie per migliorare
-          l'esperienza utente e analizzare il traffico.
+          Navigando su questo sito accetti l&apos;utilizzo di cookie per migliorare
+          l&apos;esperienza utente e analizzare il traffico.
         </p>
         <Button
           variant="default"

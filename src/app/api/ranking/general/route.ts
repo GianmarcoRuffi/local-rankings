@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { generalRanking, rankings } from "@/lib/db/schema";
+import { generalRanking } from "@/lib/db/schema";
 import { eq, or, and, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
 
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const rankingIdStr = searchParams.get("rankingId");
     const rankingId = rankingIdStr ? parseInt(rankingIdStr) : null;
 
-    let query = db.select().from(generalRanking);
+    const query = db.select().from(generalRanking);
 
     if (rankingId) {
       // Include entries for this specific ranking
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
     // Ordina usando il comparatore personalizzato
     const sorted = sortRanking(
-      rows.map((row: any) => ({
+      rows.map((row) => ({
         ...row,
         total_points: row.totalPoints ?? 0,
         t1: row.t1 ?? 0,

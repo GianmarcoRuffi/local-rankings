@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { generalRanking, rankings } from "@/lib/db/schema";
+import { generalRanking } from "@/lib/db/schema";
 import { eq, or, and, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
 
@@ -46,7 +46,7 @@ export async function PATCH(
       .where(eq(generalRanking.id, playerId));
 
     // Fetch all players in the same ranking
-    let query = db
+    const query = db
       .select({ id: generalRanking.id, totalPoints: generalRanking.totalPoints, t1: generalRanking.t1 })
       .from(generalRanking);
     

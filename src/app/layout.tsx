@@ -33,7 +33,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
         <Providers>
-          <div className="flex-1 pb-20">{children}</div>
+          <div className="flex-1 pb-16">{children}</div>
           <Footer />
           <CookieConsent />
           <ScrollToTop />

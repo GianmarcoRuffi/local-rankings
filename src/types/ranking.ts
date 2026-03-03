@@ -21,25 +21,25 @@ export interface GeneralRankingPlayer {
 
 export interface StageRankingPlayer {
   id: number;
-  stage_id: number;
+  stageId: number;
   position: number;
   name: string;
   score: number | null;
-  points_awarded: number;
+  pointsAwarded: number;
   t1: number;
   presenze: number;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface Stage {
   id: number;
-  ranking_id: number | null;
+  rankingId: number | null;
   name: string;
   date: string | null;
-  pdf_filename: string | null;
+  pdfFilename: string | null;
   status: "pending" | "active" | "merged";
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SortConfig {

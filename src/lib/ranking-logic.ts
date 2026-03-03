@@ -32,7 +32,7 @@ export function getPointsForPosition(position: number): number {
 
 export function parsePdfText(text: string): ParsedPlayer[] {
   const lines = text
-    .split('\n')
+    .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
@@ -64,7 +64,7 @@ export function parsePdfText(text: string): ParsedPlayer[] {
       const name = match[2].trim();
       const vp = parseInt(match[3], 10);
       const t1Str = match[4];
-      const t1 = parseInt(t1Str.replace('+', ''), 10);
+      const t1 = parseInt(t1Str.replace("+", ""), 10);
 
       if (position >= 1 && name.length > 0 && !isNaN(vp)) {
         players.push({
@@ -87,7 +87,7 @@ export function parsePdfTableData(tableRows: string[][]): ParsedTablePlayer[] {
   for (const row of tableRows) {
     if (row.length < 4) continue;
 
-    const [col0, col1, col2, col3] = row.map((c) => (c ?? '').trim());
+    const [col0, col1, col2, col3] = row.map((c) => (c ?? "").trim());
 
     const position = parseInt(col0, 10);
     if (isNaN(position) || position < 1) continue;
@@ -95,14 +95,14 @@ export function parsePdfTableData(tableRows: string[][]): ParsedTablePlayer[] {
     const name = col1;
     if (!name || name.length === 0) continue;
 
-    const scoreStr = col2.replace(',', '.');
+    const scoreStr = col2.replace(",", ".");
     const score =
-      scoreStr !== '' && !isNaN(parseFloat(scoreStr))
+      scoreStr !== "" && !isNaN(parseFloat(scoreStr))
         ? parseFloat(scoreStr)
         : null;
 
-    const t1Str = col3.replace(/\s/g, '');
-    const t1 = t1Str !== '' ? parseInt(t1Str, 10) : 0;
+    const t1Str = col3.replace(/\s/g, "");
+    const t1 = t1Str !== "" ? parseInt(t1Str, 10) : 0;
 
     players.push({ position, name, score, t1: isNaN(t1) ? 0 : t1 });
   }
@@ -125,18 +125,18 @@ export interface MergeResult {
 
 export function calculateMerge(
   generalRanking: Array<{ name: string; total_points: number; t1: number }>,
-  stagePlayers: Array<{ name: string; points_awarded: number; t1: number }>,
+  stagePlayers: Array<{ name: string; pointsAwarded: number; t1: number }>,
 ): MergeResult {
   const generalMap = new Map(
     generalRanking.map((p) => [p.name.toLowerCase(), p]),
   );
-  const updatedPlayers: MergeResult['updatedPlayers'] = [];
+  const updatedPlayers: MergeResult["updatedPlayers"] = [];
 
   for (const stagePlayer of stagePlayers) {
     const key = stagePlayer.name.toLowerCase();
     const existing = generalMap.get(key);
     const previousPoints = existing?.total_points ?? 0;
-    const addedPoints = stagePlayer.points_awarded;
+    const addedPoints = stagePlayer.pointsAwarded;
     const previousT1 = existing?.t1 ?? 0;
     const addedT1 = stagePlayer.t1;
 
@@ -231,7 +231,7 @@ export function capitalizeName(name: string): string {
   if (!name || name.length === 0) return name;
 
   // Split su virgola se presente (formato "cognome, nome")
-  const parts = name.split(',').map((part) => part.trim());
+  const parts = name.split(",").map((part) => part.trim());
 
   // Capitalizza ogni parte
   const capitalizedParts = parts.map((part) => {
@@ -241,28 +241,28 @@ export function capitalizeName(name: string): string {
       .map((word) => {
         if (word.length === 0) return word;
         // Preserva parentesi e altri caratteri speciali
-        if (word.includes('(')) {
+        if (word.includes("(")) {
           return word
-            .split('(')
+            .split("(")
             .map((w) => {
               if (w.length === 0) return w;
               return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
             })
-            .join('(');
+            .join("(");
         }
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
       })
-      .join(' ');
+      .join(" ");
   });
 
-  return capitalizedParts.join(', ');
+  return capitalizedParts.join(", ");
 }
 
 /**
  * Formatta il valore T1 con segno positivo se necessario
  */
 export function formatT1(value: number | null | undefined): string {
-  if (value === null || value === undefined || value === 0) return '0';
+  if (value === null || value === undefined || value === 0) return "0";
   if (value > 0) return `+${value}`;
   return String(value);
 }
@@ -271,7 +271,7 @@ export function formatT1(value: number | null | undefined): string {
  * Ordina i giocatori alfabeticamente per nome
  */
 export function sortByName<T extends { name: string }>(players: T[]): T[] {
-  return [...players].sort((a, b) => a.name.localeCompare(b.name, 'it'));
+  return [...players].sort((a, b) => a.name.localeCompare(b.name, "it"));
 }
 
 /**

@@ -87,7 +87,7 @@ function T1Badge({ t1 }: { t1: number }) {
     return (
       <Badge
         variant="outline"
-        className="font-bold text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400"
+        className="font-bold text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400 px-1 text-[10px] sm:text-xs"
       >
         +{value}
       </Badge>
@@ -97,14 +97,17 @@ function T1Badge({ t1 }: { t1: number }) {
     return (
       <Badge
         variant="outline"
-        className="font-bold text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400"
+        className="font-bold text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400 px-1 text-[10px] sm:text-xs"
       >
         {value}
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="font-bold text-muted-foreground">
+    <Badge
+      variant="outline"
+      className="font-bold text-muted-foreground px-1 text-[10px] sm:text-xs"
+    >
       0
     </Badge>
   );
@@ -654,15 +657,22 @@ export function StageRankingView() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableHead column="position">Pos.</SortableHead>
+                    <SortableHead column="position">
+                      <span className="hidden xs:inline">Pos.</span>
+                      <span className="xs:hidden">#</span>
+                    </SortableHead>
                     <SortableHead column="name">Giocatore</SortableHead>
                     <SortableHead column="pointsAwarded">
-                      Punti Classifica
+                      <span className="hidden sm:inline">Punti Classifica</span>
+                      <span className="sm:hidden">Punti</span>
                     </SortableHead>
                     <SortableHead column="t1">T1</SortableHead>
-                    <SortableHead column="presenze">Presenze</SortableHead>
+                    <SortableHead column="presenze">
+                      <span className="hidden xs:inline">Presenze</span>
+                      <span className="xs:hidden">Pres.</span>
+                    </SortableHead>
                     {isAuthenticated && isActive && (
-                      <TableHead className="w-24">Azioni</TableHead>
+                      <TableHead className="w-16 sm:w-24">Azioni</TableHead>
                     )}
                   </TableRow>
                 </TableHeader>
@@ -755,11 +765,14 @@ export function StageRankingView() {
                         </>
                       ) : (
                         <>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium text-xs sm:text-sm py-3">
                             {player.name}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="font-bold">
+                            <Badge
+                              variant="outline"
+                              className="font-bold text-[10px] sm:text-xs px-1 sm:px-2"
+                            >
                               +{player.pointsAwarded} pt
                             </Badge>
                           </TableCell>

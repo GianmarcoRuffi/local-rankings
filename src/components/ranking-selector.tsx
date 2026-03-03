@@ -217,9 +217,9 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
           value={selectedRanking ? String(selectedRanking.id) : ""}
           onValueChange={handleSelectRanking}
         >
-          <SelectTrigger className="w-[220px] cursor-pointer">
-            <List className="h-4 w-4 mr-2" />
-            <span className="truncate">
+          <SelectTrigger className="w-[140px] sm:w-[220px] cursor-pointer">
+            <List className="h-4 w-4 mr-2 shrink-0" />
+            <span className="truncate text-xs sm:text-sm">
               {selectedRanking?.name || "Seleziona classifica"}
             </span>
           </SelectTrigger>

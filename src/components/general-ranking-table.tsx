@@ -62,45 +62,63 @@ function SortIcon({
 function PositionBadge({ position }: { position: number }) {
   if (position === 1)
     return (
-      <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">
+      <Badge className="bg-yellow-500 text-white hover:bg-yellow-500 px-1 sm:px-2 text-[10px] sm:text-xs">
         🥇 1°
       </Badge>
     );
   if (position === 2)
     return (
-      <Badge className="bg-gray-400 text-white hover:bg-gray-400">🥈 2°</Badge>
+      <Badge className="bg-gray-400 text-white hover:bg-gray-400 px-1 sm:px-2 text-[10px] sm:text-xs">
+        🥈 2°
+      </Badge>
     );
   if (position === 3)
     return (
-      <Badge className="bg-amber-600 text-white hover:bg-amber-600">
+      <Badge className="bg-amber-600 text-white hover:bg-amber-600 px-1 sm:px-2 text-[10px] sm:text-xs">
         🥉 3°
       </Badge>
     );
   if (position === 4)
     return (
-      <Badge className="bg-blue-600 text-white hover:bg-blue-600">4°</Badge>
+      <Badge className="bg-blue-600 text-white hover:bg-blue-600 px-1 sm:px-2 text-[10px] sm:text-xs">
+        4°
+      </Badge>
     );
   if (position === 5)
     return (
-      <Badge className="bg-blue-500 text-white hover:bg-blue-500">5°</Badge>
+      <Badge className="bg-blue-500 text-white hover:bg-blue-500 px-1 sm:px-2 text-[10px] sm:text-xs">
+        5°
+      </Badge>
     );
   if (position === 6)
     return (
-      <Badge className="bg-blue-400 text-white hover:bg-blue-400">6°</Badge>
+      <Badge className="bg-blue-400 text-white hover:bg-blue-400 px-1 sm:px-2 text-[10px] sm:text-xs">
+        6°
+      </Badge>
     );
   if (position === 7)
     return (
-      <Badge className="bg-purple-500 text-white hover:bg-purple-500">7°</Badge>
+      <Badge className="bg-purple-500 text-white hover:bg-purple-500 px-1 sm:px-2 text-[10px] sm:text-xs">
+        7°
+      </Badge>
     );
   if (position === 8)
     return (
-      <Badge className="bg-purple-400 text-white hover:bg-purple-400">8°</Badge>
+      <Badge className="bg-purple-400 text-white hover:bg-purple-400 px-1 sm:px-2 text-[10px] sm:text-xs">
+        8°
+      </Badge>
     );
   if (position === 9)
     return (
-      <Badge className="bg-indigo-500 text-white hover:bg-indigo-500">9°</Badge>
+      <Badge className="bg-indigo-500 text-white hover:bg-indigo-500 px-1 sm:px-2 text-[10px] sm:text-xs">
+        9°
+      </Badge>
     );
-  return <span className="font-medium text-muted-foreground">{position}°</span>;
+  return (
+    <span className="font-medium text-muted-foreground text-xs sm:text-sm">
+      {position}°
+    </span>
+  );
 }
 
 function T1Badge({ t1 }: { t1: number }) {
@@ -109,7 +127,7 @@ function T1Badge({ t1 }: { t1: number }) {
     return (
       <Badge
         variant="outline"
-        className="font-bold text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400"
+        className="font-bold text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400 px-1 text-[10px] sm:text-xs"
       >
         +{value}
       </Badge>
@@ -119,14 +137,17 @@ function T1Badge({ t1 }: { t1: number }) {
     return (
       <Badge
         variant="outline"
-        className="font-bold text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400"
+        className="font-bold text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400 px-1 text-[10px] sm:text-xs"
       >
         {value}
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="font-bold text-muted-foreground">
+    <Badge
+      variant="outline"
+      className="font-bold text-muted-foreground px-1 text-[10px] sm:text-xs"
+    >
       0
     </Badge>
   );
@@ -481,50 +502,62 @@ export function GeneralRankingTable() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-yellow-500" />
-          {selectedRanking?.name || "Classifica Generale"}
-          <Badge variant="secondary">{players.length} giocatori</Badge>
+        <CardTitle className="flex flex-wrap items-center gap-1 sm:gap-2 text-base sm:text-xl">
+          <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
+          <span className="truncate max-w-[120px] xs:max-w-[200px] sm:max-w-none">
+            {selectedRanking?.name || "Classifica Generale"}
+          </span>
+          <Badge variant="secondary" className="text-[10px] sm:text-xs px-1">
+            {players.length} <span className="hidden xs:inline">giocatori</span>
+          </Badge>
         </CardTitle>
         {isAuthenticated && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-1 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={fetchPlayers}
               disabled={loading}
+              className="h-8 px-2 sm:h-9 sm:px-3"
+              title="Aggiorna"
             >
               <RefreshCw
-                className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                className={`h-4 w-4 sm:mr-2 ${loading ? "animate-spin" : ""}`}
               />
-              Aggiorna
+              <span className="hidden sm:inline">Aggiorna</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={exportToExcel}
               disabled={loading || players.length === 0}
+              className="h-8 px-2 sm:h-9 sm:px-3"
+              title="Esporta Excel"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Esporta Excel
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Esporta Excel</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={exportToPDF}
               disabled={loading || players.length === 0}
+              className="h-8 px-2 sm:h-9 sm:px-3"
+              title="Esporta PDF"
             >
-              <FileText className="h-4 w-4 mr-2" />
-              Esporta PDF
+              <FileText className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Esporta PDF</span>
             </Button>
             <Button
               variant="destructive"
               size="sm"
               onClick={() => setResetDialogOpen(true)}
               disabled={loading || players.length === 0}
+              className="h-8 px-2 sm:h-9 sm:px-3"
+              title="Reset classifica"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Reset classifica
+              <Trash2 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Reset</span>
             </Button>
           </div>
         )}
@@ -549,13 +582,22 @@ export function GeneralRankingTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <SortableHead column="position">Pos.</SortableHead>
+                <SortableHead column="position">
+                  <span className="hidden xs:inline">Pos.</span>
+                  <span className="xs:hidden">#</span>
+                </SortableHead>
                 <SortableHead column="name">Giocatore</SortableHead>
-                <SortableHead column="total_points">Punti Totali</SortableHead>
+                <SortableHead column="total_points">
+                  <span className="hidden sm:inline">Punti Totali</span>
+                  <span className="sm:hidden">Punti</span>
+                </SortableHead>
                 <SortableHead column="t1">T1</SortableHead>
-                <SortableHead column="presenze">Presenze</SortableHead>
+                <SortableHead column="presenze">
+                  <span className="hidden xs:inline">Presenze</span>
+                  <span className="xs:hidden">Pres.</span>
+                </SortableHead>
                 {isAuthenticated && (
-                  <TableHead className="w-24">Azioni</TableHead>
+                  <TableHead className="w-16 sm:w-24">Azioni</TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -652,11 +694,11 @@ export function GeneralRankingTable() {
                     </>
                   ) : (
                     <>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium text-xs sm:text-sm py-3">
                         {player.name}
                       </TableCell>
                       <TableCell>
-                        <span className="font-bold text-primary text-lg">
+                        <span className="font-bold text-primary text-base sm:text-lg">
                           {player.total_points}
                         </span>
                       </TableCell>

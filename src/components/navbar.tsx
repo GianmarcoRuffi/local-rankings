@@ -53,11 +53,11 @@ export function Navbar({ user }: NavbarProps) {
   return (
     <nav className="border-b bg-card shadow-sm">
       <div className="container mx-auto px-4 max-w-7xl">
-        <div className="flex h-16 items-center justify-between gap-2 overflow-x-auto md:overflow-visible">
-          <div className="flex items-center gap-2 md:gap-6 shrink-0">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-primary shrink-0" />
-              <span className="font-bold text-lg hidden sm:inline shrink-0">
+        <div className="flex h-16 items-center justify-between gap-1 md:gap-4">
+          <div className="flex items-center gap-1 md:gap-6 shrink-0">
+            <Link href="/dashboard" className="flex items-center gap-1 sm:gap-2">
+              <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+              <span className="font-bold text-base sm:text-lg hidden xs:inline shrink-0">
                 Rankings
               </span>
             </Link>
@@ -83,13 +83,13 @@ export function Navbar({ user }: NavbarProps) {
               })}
             </div>
           </div>
-          <div className="flex items-center gap-1 md:gap-3 shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-3 shrink-0">
             <RankingSelector />
             {user ? (
               <>
-                <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="hidden lg:flex items-center gap-2 text-sm text-muted-foreground">
                   <User className="h-4 w-4" />
-                  <span className="hidden md:inline">
+                  <span className="hidden xl:inline">
                     {user.name || user.email}
                   </span>
                 </div>
@@ -97,7 +97,8 @@ export function Navbar({ user }: NavbarProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2 px-2 md:px-4"
+                    className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-4 sm:gap-2"
+                    title="Cambia password"
                   >
                     <KeyRound className="h-4 w-4 shrink-0" />
                     <span className="hidden sm:inline">Cambia password</span>
@@ -107,7 +108,8 @@ export function Navbar({ user }: NavbarProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="gap-2 px-2 md:px-4"
+                  className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-4 sm:gap-2 text-destructive hover:text-destructive"
+                  title="Esci"
                 >
                   <LogOut className="h-4 w-4 shrink-0" />
                   <span className="hidden sm:inline">Esci</span>
@@ -118,7 +120,8 @@ export function Navbar({ user }: NavbarProps) {
                 variant="default"
                 size="sm"
                 onClick={() => signIn(undefined, { callbackUrl: "/dashboard" })}
-                className="gap-2 px-2 md:px-4"
+                className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-4 sm:gap-2"
+                title="Accedi"
               >
                 <LogIn className="h-4 w-4 shrink-0" />
                 <span className="hidden sm:inline">Accedi</span>

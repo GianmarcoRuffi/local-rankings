@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
+  --breakpoint-xs: 480px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

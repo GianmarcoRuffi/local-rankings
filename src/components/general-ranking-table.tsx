@@ -43,32 +43,63 @@ import { t1Comparator } from "@/lib/ranking-logic";
 import { useRanking } from "@/hooks/useRanking";
 import * as XLSX from "xlsx";
 
-function SortIcon({ column, sortConfig }: { column: string; sortConfig: SortConfig }) {
-  if (sortConfig.key !== column) return <ChevronsUpDown className="h-4 w-4 ml-1 opacity-50" />;
-  return sortConfig.direction === "asc"
-    ? <ChevronUp className="h-4 w-4 ml-1" />
-    : <ChevronDown className="h-4 w-4 ml-1" />;
+function SortIcon({
+  column,
+  sortConfig,
+}: {
+  column: string;
+  sortConfig: SortConfig;
+}) {
+  if (sortConfig.key !== column)
+    return <ChevronsUpDown className="h-4 w-4 ml-1 opacity-50" />;
+  return sortConfig.direction === "asc" ? (
+    <ChevronUp className="h-4 w-4 ml-1" />
+  ) : (
+    <ChevronDown className="h-4 w-4 ml-1" />
+  );
 }
 
 function PositionBadge({ position }: { position: number }) {
   if (position === 1)
-    return <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">🥇 1°</Badge>;
+    return (
+      <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">
+        🥇 1°
+      </Badge>
+    );
   if (position === 2)
-    return <Badge className="bg-gray-400 text-white hover:bg-gray-400">🥈 2°</Badge>;
+    return (
+      <Badge className="bg-gray-400 text-white hover:bg-gray-400">🥈 2°</Badge>
+    );
   if (position === 3)
-    return <Badge className="bg-amber-600 text-white hover:bg-amber-600">🥉 3°</Badge>;
+    return (
+      <Badge className="bg-amber-600 text-white hover:bg-amber-600">
+        🥉 3°
+      </Badge>
+    );
   if (position === 4)
-    return <Badge className="bg-blue-600 text-white hover:bg-blue-600">4°</Badge>;
+    return (
+      <Badge className="bg-blue-600 text-white hover:bg-blue-600">4°</Badge>
+    );
   if (position === 5)
-    return <Badge className="bg-blue-500 text-white hover:bg-blue-500">5°</Badge>;
+    return (
+      <Badge className="bg-blue-500 text-white hover:bg-blue-500">5°</Badge>
+    );
   if (position === 6)
-    return <Badge className="bg-blue-400 text-white hover:bg-blue-400">6°</Badge>;
+    return (
+      <Badge className="bg-blue-400 text-white hover:bg-blue-400">6°</Badge>
+    );
   if (position === 7)
-    return <Badge className="bg-purple-500 text-white hover:bg-purple-500">7°</Badge>;
+    return (
+      <Badge className="bg-purple-500 text-white hover:bg-purple-500">7°</Badge>
+    );
   if (position === 8)
-    return <Badge className="bg-purple-400 text-white hover:bg-purple-400">8°</Badge>;
+    return (
+      <Badge className="bg-purple-400 text-white hover:bg-purple-400">8°</Badge>
+    );
   if (position === 9)
-    return <Badge className="bg-indigo-500 text-white hover:bg-indigo-500">9°</Badge>;
+    return (
+      <Badge className="bg-indigo-500 text-white hover:bg-indigo-500">9°</Badge>
+    );
   return <span className="font-medium text-muted-foreground">{position}°</span>;
 }
 
@@ -76,14 +107,20 @@ function T1Badge({ t1 }: { t1: number }) {
   const value = t1 || 0;
   if (value > 0) {
     return (
-      <Badge variant="outline" className="font-bold text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400">
+      <Badge
+        variant="outline"
+        className="font-bold text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400"
+      >
         +{value}
       </Badge>
     );
   }
   if (value < 0) {
     return (
-      <Badge variant="outline" className="font-bold text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400">
+      <Badge
+        variant="outline"
+        className="font-bold text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400"
+      >
         {value}
       </Badge>
     );
@@ -130,14 +167,20 @@ export function GeneralRankingTable() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editState, setEditState] = useState<EditState>({ name: "", total_points: "", t1: "", presenze: "" });
+  const [editState, setEditState] = useState<EditState>({
+    name: "",
+    total_points: "",
+    t1: "",
+    presenze: "",
+  });
   const [saving, setSaving] = useState(false);
   const [confirmEditDialogOpen, setConfirmEditDialogOpen] = useState(false);
-  const [playerToConfirmEdit, setPlayerToConfirmEdit] = useState<GeneralRankingPlayer | null>(null);
+  const [playerToConfirmEdit, setPlayerToConfirmEdit] =
+    useState<GeneralRankingPlayer | null>(null);
 
   const fetchPlayers = useCallback(async () => {
     if (!selectedRanking) return;
-    
+
     setLoading(true);
     try {
       const url = `/api/ranking/general?rankingId=${selectedRanking.id}`;
@@ -164,17 +207,28 @@ export function GeneralRankingTable() {
 
   const handleReset = async () => {
     if (!selectedRanking) return;
-    
+
     setResetting(true);
     try {
-      const res = await fetch(`/api/ranking/general/reset?rankingId=${selectedRanking.id}`, { method: "POST" });
+      const res = await fetch(
+        `/api/ranking/general/reset?rankingId=${selectedRanking.id}`,
+        { method: "POST" },
+      );
       if (res.ok) {
-        toast({ title: "Classifica azzerata", description: "Tutti i dati della classifica sono stati eliminati.", variant: "success" as Parameters<typeof toast>[0]["variant"] });
+        toast({
+          title: "Classifica azzerata",
+          description: "Tutti i dati della classifica sono stati eliminati.",
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
         setPlayers([]);
         setResetDialogOpen(false);
       } else {
         const data = await res.json();
-        toast({ title: "Errore", description: data.error, variant: "destructive" });
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
       }
     } finally {
       setResetting(false);
@@ -210,12 +264,20 @@ export function GeneralRankingTable() {
         }),
       });
       if (res.ok) {
-        toast({ title: "Salvato", description: "Giocatore aggiornato con successo.", variant: "success" as Parameters<typeof toast>[0]["variant"] });
+        toast({
+          title: "Salvato",
+          description: "Giocatore aggiornato con successo.",
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
         setEditingId(null);
         await fetchPlayers();
       } else {
         const data = await res.json();
-        toast({ title: "Errore", description: data.error, variant: "destructive" });
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
       }
     } finally {
       setSaving(false);
@@ -260,11 +322,11 @@ export function GeneralRankingTable() {
     if (sortedPlayers.length === 0) return;
 
     const data = sortedPlayers.map((player) => ({
-      "Posizione": player.position,
-      "Giocatore": player.name,
+      Posizione: player.position,
+      Giocatore: player.name,
       "Punti Totali": player.total_points,
-      "T1": player.t1 ?? 0,
-      "Presenze": player.presenze,
+      T1: player.t1 ?? 0,
+      Presenze: player.presenze,
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -280,8 +342,8 @@ export function GeneralRankingTable() {
     ];
     ws["!cols"] = colWidths;
 
-    const filename = selectedRanking 
-      ? `classifica_${selectedRanking.name.toLowerCase().replace(/\s+/g, '_')}.xlsx`
+    const filename = selectedRanking
+      ? `classifica_${selectedRanking.name.toLowerCase().replace(/\s+/g, "_")}.xlsx`
       : "classifica_generale.xlsx";
     XLSX.writeFile(wb, filename);
   };
@@ -302,21 +364,21 @@ export function GeneralRankingTable() {
     doc.text(
       `${players.length} giocatori - Esportato il ${new Date().toLocaleDateString("it-IT")}`,
       14,
-      22
+      22,
     );
 
     // Position colors helper (RGB)
     const getPositionColor = (pos: number): [number, number, number] => {
       const colors: Record<number, [number, number, number]> = {
-        1: [234, 179, 8],   // yellow-500
+        1: [234, 179, 8], // yellow-500
         2: [156, 163, 175], // gray-400
-        3: [217, 119, 6],   // amber-600
-        4: [37, 99, 235],   // blue-600
-        5: [59, 130, 246],  // blue-500
-        6: [96, 165, 250],  // blue-400
-        7: [168, 85, 247],  // purple-500
+        3: [217, 119, 6], // amber-600
+        4: [37, 99, 235], // blue-600
+        5: [59, 130, 246], // blue-500
+        6: [96, 165, 250], // blue-400
+        7: [168, 85, 247], // purple-500
         8: [192, 132, 252], // purple-400
-        9: [99, 102, 241],  // indigo-500
+        9: [99, 102, 241], // indigo-500
       };
       return colors[pos] || [107, 114, 128];
     };
@@ -398,7 +460,13 @@ export function GeneralRankingTable() {
     });
   };
 
-  const SortableHead = ({ column, children }: { column: string; children: React.ReactNode }) => (
+  const SortableHead = ({
+    column,
+    children,
+  }: {
+    column: string;
+    children: React.ReactNode;
+  }) => (
     <TableHead
       className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
       onClick={() => handleSort(column)}
@@ -420,8 +488,15 @@ export function GeneralRankingTable() {
         </CardTitle>
         {isAuthenticated && (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fetchPlayers} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchPlayers}
+              disabled={loading}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+              />
               Aggiorna
             </Button>
             <Button
@@ -465,7 +540,9 @@ export function GeneralRankingTable() {
         ) : players.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Trophy className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-lg font-medium">Nessun giocatore in classifica</p>
+            <p className="text-lg font-medium">
+              Nessun giocatore in classifica
+            </p>
             <p className="text-sm">Aggiungi almeno una tappa per iniziare</p>
           </div>
         ) : (
@@ -477,7 +554,9 @@ export function GeneralRankingTable() {
                 <SortableHead column="total_points">Punti Totali</SortableHead>
                 <SortableHead column="t1">T1</SortableHead>
                 <SortableHead column="presenze">Presenze</SortableHead>
-                {isAuthenticated && <TableHead className="w-24">Azioni</TableHead>}
+                {isAuthenticated && (
+                  <TableHead className="w-24">Azioni</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -488,8 +567,8 @@ export function GeneralRankingTable() {
                     index < 3
                       ? "bg-yellow-50/50 dark:bg-yellow-950/10"
                       : index < 9
-                      ? "bg-blue-50/30 dark:bg-blue-950/10"
-                      : ""
+                        ? "bg-blue-50/30 dark:bg-blue-950/10"
+                        : ""
                   }
                 >
                   <TableCell>
@@ -500,7 +579,12 @@ export function GeneralRankingTable() {
                       <TableCell>
                         <Input
                           value={editState.name}
-                          onChange={(e) => setEditState((s) => ({ ...s, name: e.target.value }))}
+                          onChange={(e) =>
+                            setEditState((s) => ({
+                              ...s,
+                              name: e.target.value,
+                            }))
+                          }
                           className="h-8 w-40"
                         />
                       </TableCell>
@@ -508,7 +592,12 @@ export function GeneralRankingTable() {
                         <Input
                           type="number"
                           value={editState.total_points}
-                          onChange={(e) => setEditState((s) => ({ ...s, total_points: e.target.value }))}
+                          onChange={(e) =>
+                            setEditState((s) => ({
+                              ...s,
+                              total_points: e.target.value,
+                            }))
+                          }
                           className="h-8 w-20"
                         />
                       </TableCell>
@@ -516,7 +605,9 @@ export function GeneralRankingTable() {
                         <Input
                           type="number"
                           value={editState.t1}
-                          onChange={(e) => setEditState((s) => ({ ...s, t1: e.target.value }))}
+                          onChange={(e) =>
+                            setEditState((s) => ({ ...s, t1: e.target.value }))
+                          }
                           className="h-8 w-20"
                         />
                       </TableCell>
@@ -524,19 +615,36 @@ export function GeneralRankingTable() {
                         <Input
                           type="number"
                           value={editState.presenze}
-                          onChange={(e) => setEditState((s) => ({ ...s, presenze: e.target.value }))}
+                          onChange={(e) =>
+                            setEditState((s) => ({
+                              ...s,
+                              presenze: e.target.value,
+                            }))
+                          }
                           className="h-8 w-20"
                         />
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600" onClick={() => {
-                            setPlayerToConfirmEdit(player);
-                            setConfirmEditDialogOpen(true);
-                          }} disabled={saving}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-green-600"
+                            onClick={() => {
+                              setPlayerToConfirmEdit(player);
+                              setConfirmEditDialogOpen(true);
+                            }}
+                            disabled={saving}
+                          >
                             <Check className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600" onClick={cancelEdit} disabled={saving}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-red-600"
+                            onClick={cancelEdit}
+                            disabled={saving}
+                          >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
@@ -544,7 +652,9 @@ export function GeneralRankingTable() {
                     </>
                   ) : (
                     <>
-                      <TableCell className="font-medium">{player.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {player.name}
+                      </TableCell>
                       <TableCell>
                         <span className="font-bold text-primary text-lg">
                           {player.total_points}
@@ -558,7 +668,12 @@ export function GeneralRankingTable() {
                       </TableCell>
                       {isAuthenticated && (
                         <TableCell>
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => startEdit(player)}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={() => startEdit(player)}
+                          >
                             <Pencil className="h-4 w-4" />
                           </Button>
                         </TableCell>
@@ -580,16 +695,25 @@ export function GeneralRankingTable() {
               Azzerare la classifica?
             </DialogTitle>
             <DialogDescription>
-              Stai per eliminare tutti i dati della classifica <strong>&quot;{selectedRanking?.name}&quot;</strong>.
-              Questa operazione è <strong>irreversibile</strong>: tutti i punti, T1, presenze e posizioni verranno
-              cancellati definitivamente.
+              Stai per eliminare tutti i dati della classifica{" "}
+              <strong>&quot;{selectedRanking?.name}&quot;</strong>. Questa
+              operazione è <strong>irreversibile</strong>: tutti i punti, T1,
+              presenze e posizioni verranno cancellati definitivamente.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResetDialogOpen(false)} disabled={resetting}>
+            <Button
+              variant="outline"
+              onClick={() => setResetDialogOpen(false)}
+              disabled={resetting}
+            >
               Annulla
             </Button>
-            <Button variant="destructive" onClick={handleReset} disabled={resetting}>
+            <Button
+              variant="destructive"
+              onClick={handleReset}
+              disabled={resetting}
+            >
               {resetting ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />

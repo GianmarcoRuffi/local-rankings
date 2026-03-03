@@ -33,8 +33,32 @@ export function RankingProvider({ children }: { children: ReactNode }) {
         const data: Ranking[] = await res.json();
         setRankings(data);
 
-        // Set default ranking or first one
-        if (data.length > 0 && !selectedRanking) {
+        if (data.length > 0) {
+          // 1. Controlla URL params
+          const params = new URLSearchParams(window.location.search);
+          const rankingIdParam = params.get("rankingId");
+          if (rankingIdParam) {
+            const found = data.find((r) => String(r.id) === rankingIdParam);
+            if (found) {
+              setSelectedRanking(found);
+              localStorage.setItem("selectedRankingId", String(found.id));
+              setLoading(false);
+              return;
+            }
+          }
+
+          // 2. Controlla localStorage
+          const storedId = localStorage.getItem("selectedRankingId");
+          if (storedId) {
+            const found = data.find((r) => String(r.id) === storedId);
+            if (found) {
+              setSelectedRanking(found);
+              setLoading(false);
+              return;
+            }
+          }
+
+          // 3. Fallback al default
           const defaultRanking = data.find((r) => r.is_default) || data[0];
           setSelectedRanking(defaultRanking);
         }
@@ -44,54 +68,20 @@ export function RankingProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedRanking]);
+  }, []);
 
   useEffect(() => {
     fetchRankings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchRankings]);
 
   const handleSetSelectedRanking = useCallback((ranking: Ranking | null) => {
     setSelectedRanking(ranking);
-    // Store in localStorage for persistence
     if (ranking) {
       localStorage.setItem("selectedRankingId", String(ranking.id));
     }
   }, []);
 
-  // Check URL params and localStorage on mount
-  useEffect(() => {
-    if (rankings.length > 0 && !selectedRanking) {
-      // Check URL param for ranking ID
-      const params = new URLSearchParams(window.location.search);
-      const rankingIdParam = params.get("rankingId");
-
-      if (rankingIdParam) {
-        const foundRanking = rankings.find(
-          (r) => String(r.id) === rankingIdParam,
-        );
-        if (foundRanking) {
-          setSelectedRanking(foundRanking);
-          localStorage.setItem("selectedRankingId", String(foundRanking.id));
-          return;
-        }
-      }
-
-      // Restore from localStorage
-      const storedId = localStorage.getItem("selectedRankingId");
-      if (storedId) {
-        const found = rankings.find((r) => String(r.id) === storedId);
-        if (found) {
-          setSelectedRanking(found);
-          return;
-        }
-      }
-
-      // Default fallback
-      const defaultRanking = rankings.find((r) => r.is_default) || rankings[0];
-      setSelectedRanking(defaultRanking);
-    }
-  }, [rankings, selectedRanking]);
+  // Rimuovi il secondo useEffect ridondante che faceva confusione
 
   return (
     <RankingContext.Provider

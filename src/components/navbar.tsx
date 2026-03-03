@@ -106,10 +106,10 @@ export function Navbar({ user }: NavbarProps) {
                     </Button>
                   </Link>
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     size="sm"
                     onClick={() => signOut({ callbackUrl: "/dashboard" })}
-                    className="h-9 px-4 gap-2 text-destructive hover:text-destructive"
+                    className="h-9 px-4 gap-2 font-semibold"
                     title="Esci"
                   >
                     <LogOut className="h-4 w-4 shrink-0" />
@@ -169,10 +169,10 @@ export function Navbar({ user }: NavbarProps) {
                   </Button>
                 </Link>
                 <Button
-                  variant="ghost"
+                  variant="destructive"
                   size="sm"
                   onClick={() => signOut({ callbackUrl: "/dashboard" })}
-                  className="h-8 gap-2 text-xs text-destructive hover:text-destructive"
+                  className="h-8 gap-2 text-xs font-semibold"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   Esci
@@ -180,7 +180,7 @@ export function Navbar({ user }: NavbarProps) {
               </>
             ) : (
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
                 onClick={() => signIn(undefined, { callbackUrl: "/dashboard" })}
                 className="h-8 gap-2 text-xs"

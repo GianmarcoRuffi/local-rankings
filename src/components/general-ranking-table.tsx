@@ -502,13 +502,18 @@ export function GeneralRankingTable() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex flex-wrap items-center gap-1 sm:gap-2 text-base sm:text-xl">
-          <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
-          <span className="truncate max-w-[120px] xs:max-w-[200px] sm:max-w-none">
-            {selectedRanking?.name || "Classifica Generale"}
-          </span>
-          <Badge variant="secondary" className="text-[10px] sm:text-xs px-1">
-            {players.length} <span className="hidden xs:inline">giocatori</span>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base sm:text-xl min-w-0">
+          <div className="flex items-center gap-2">
+            <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 shrink-0" />
+            <span className="font-bold break-words">
+              {selectedRanking?.name || "Classifica Generale"}
+            </span>
+          </div>
+          <Badge
+            variant="secondary"
+            className="text-[10px] sm:text-xs px-2 py-0.5 whitespace-nowrap ml-1"
+          >
+            {players.length} <span className="hidden xs:inline ml-1">giocatori</span>
           </Badge>
         </CardTitle>
         <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
@@ -612,9 +617,9 @@ export function GeneralRankingTable() {
                   key={player.id}
                   className={
                     index < 3
-                      ? "bg-yellow-50/50 dark:bg-yellow-950/10"
+                      ? "bg-yellow-50/50 dark:bg-yellow-400/10"
                       : index < 9
-                        ? "bg-blue-50/30 dark:bg-blue-950/10"
+                        ? "bg-blue-50/30 dark:bg-blue-400/10"
                         : ""
                   }
                 >

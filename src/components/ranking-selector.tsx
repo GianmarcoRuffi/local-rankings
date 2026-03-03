@@ -282,9 +282,9 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
                 </Button>
                 {!selectedRanking.is_default && (
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="icon"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
                     onClick={() => openDeleteDialog(selectedRanking)}
                     title="Elimina classifica"
                   >

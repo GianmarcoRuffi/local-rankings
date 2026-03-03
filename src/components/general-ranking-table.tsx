@@ -132,6 +132,8 @@ export function GeneralRankingTable() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editState, setEditState] = useState<EditState>({ name: "", total_points: "", t1: "", presenze: "" });
   const [saving, setSaving] = useState(false);
+  const [confirmEditDialogOpen, setConfirmEditDialogOpen] = useState(false);
+  const [playerToConfirmEdit, setPlayerToConfirmEdit] = useState<GeneralRankingPlayer | null>(null);
 
   const fetchPlayers = useCallback(async () => {
     if (!selectedRanking) return;
@@ -528,7 +530,10 @@ export function GeneralRankingTable() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600" onClick={() => saveEdit(player.id)} disabled={saving}>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600" onClick={() => {
+                            setPlayerToConfirmEdit(player);
+                            setConfirmEditDialogOpen(true);
+                          }} disabled={saving}>
                             <Check className="h-4 w-4" />
                           </Button>
                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600" onClick={cancelEdit} disabled={saving}>
@@ -594,6 +599,53 @@ export function GeneralRankingTable() {
                 <>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Sì, azzera tutto
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmEditDialogOpen}
+        onOpenChange={setConfirmEditDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conferma modifica</DialogTitle>
+            <DialogDescription>
+              Stai per modificare i record del giocatore{" "}
+              <strong>&quot;{playerToConfirmEdit?.name}&quot;</strong>. Vuoi
+              procedere?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmEditDialogOpen(false)}
+              disabled={saving}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                if (playerToConfirmEdit) {
+                  saveEdit(playerToConfirmEdit.id);
+                  setConfirmEditDialogOpen(false);
+                }
+              }}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Sì, modifica
                 </>
               )}
             </Button>

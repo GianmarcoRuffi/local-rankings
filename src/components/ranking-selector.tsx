@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -28,9 +29,10 @@ import { toast } from "@/hooks/use-toast";
 
 interface RankingSelectorProps {
   onRankingChange?: (ranking: Ranking | null) => void;
+  className?: string;
 }
 
-export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
+export function RankingSelector({ onRankingChange, className }: RankingSelectorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -220,12 +222,15 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className={cn("flex items-center gap-2", className)}>
         <Select
           value={selectedRanking ? String(selectedRanking.id) : ""}
           onValueChange={handleSelectRanking}
         >
-          <SelectTrigger className="w-[110px] xs:w-[140px] sm:w-[220px] cursor-pointer">
+          <SelectTrigger className={cn(
+            "w-[110px] xs:w-[140px] sm:w-[220px] cursor-pointer",
+            className?.includes("flex-1") && "w-full"
+          )}>
             <List className="h-4 w-4 mr-2 shrink-0" />
             <span className="truncate text-xs sm:text-sm">
               {selectedRanking?.name || "Seleziona classifica"}

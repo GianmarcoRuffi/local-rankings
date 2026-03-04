@@ -64,11 +64,16 @@ export function Navbar({ user }: NavbarProps) {
     <nav
       className={cn(
         "sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 transition-all duration-300",
-        isScrolled ? "h-14 shadow-md" : "h-16 shadow-sm"
+        isScrolled ? "h-14 shadow-md" : "h-auto md:h-16 shadow-sm"
       )}
     >
-      <div className="container mx-auto px-4 max-w-7xl h-full">
-        <div className="flex h-full items-center justify-between gap-1 md:gap-4">
+      <div className="container mx-auto px-4 max-w-7xl">
+        <div 
+          className={cn(
+            "flex items-center justify-between gap-1 md:gap-4 transition-all duration-300",
+            isScrolled ? "h-14" : "h-16"
+          )}
+        >
           <div className="flex items-center gap-1 md:gap-6 shrink-0">
             <Link href="/dashboard" className="flex items-center gap-1 sm:gap-2">
               <Trophy

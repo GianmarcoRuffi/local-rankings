@@ -64,177 +64,133 @@ export function Navbar({ user }: NavbarProps) {
     <nav
       className={cn(
         "sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 transition-all duration-300",
-        isScrolled ? "h-14 shadow-md" : "h-auto md:h-16 shadow-sm"
+        isScrolled ? "shadow-md" : "shadow-sm"
       )}
     >
       <div className="container mx-auto px-4 max-w-7xl">
+        {/* Main Header Row: Logo, Ranking Selector, User Actions */}
         <div 
           className={cn(
-            "flex items-center justify-between gap-1 md:gap-4 transition-all duration-300",
+            "flex items-center justify-between gap-2 transition-all duration-300",
             isScrolled ? "h-14" : "h-16"
           )}
         >
-          <div className="flex items-center gap-1 md:gap-6 shrink-0">
-            <Link href="/dashboard" className="flex items-center gap-1 sm:gap-2">
-              <Trophy
-                className={cn(
-                  "text-primary shrink-0 transition-all duration-300",
-                  isScrolled ? "h-5 w-5" : "h-6 w-6"
-                )}
-              />
-              <span
-                className={cn(
-                  "font-bold hidden xs:inline shrink-0 transition-all duration-300",
-                  isScrolled ? "text-base" : "text-lg"
-                )}
-              >
-                Rankings
-              </span>
-            </Link>
-            <div className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  item.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname.startsWith(item.href);
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      size="sm"
-                      className={cn(
-                        "gap-2 transition-all duration-300",
-                        isScrolled ? "h-8 px-2 text-xs" : "h-9 px-3"
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                );
-              })}
-            </div>
+          {/* Logo Section */}
+          <Link href="/dashboard" className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <Trophy
+              className={cn(
+                "text-primary shrink-0 transition-all duration-300",
+                isScrolled ? "h-5 w-5" : "h-6 w-6"
+              )}
+            />
+            <span
+              className={cn(
+                "font-bold hidden md:inline shrink-0 transition-all duration-300",
+                isScrolled ? "text-base" : "text-lg"
+              )}
+            >
+              Rankings
+            </span>
+          </Link>
+
+          {/* Nav Items (Desktop only) */}
+          <div className="hidden lg:flex items-center gap-1 mx-4">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(item.href);
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button
+                    variant={isActive ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "gap-2 transition-all duration-300",
+                      isScrolled ? "h-8 px-2 text-xs" : "h-9 px-3"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Button>
+                </Link>
+              );
+            })}
           </div>
-          <div className="flex items-center gap-0.5 sm:gap-3 shrink-0">
+
+          {/* Right Section: Selector + User Actions */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <RankingSelector />
-            <div className="hidden sm:flex items-center gap-1 md:gap-3">
+            
+            <div className="flex items-center gap-1 border-l border-border ml-1 pl-1 sm:pl-2">
               {user ? (
                 <>
-                  <div className="hidden lg:flex items-center gap-2 text-sm text-muted-foreground">
-                    <User className="h-4 w-4" />
-                    <span className="hidden xl:inline">
-                      {user.name || user.email}
-                    </span>
-                  </div>
                   <Link href="/dashboard/change-password">
                     <Button
                       variant="outline"
-                      size="sm"
-                      className={cn(
-                        "gap-2 transition-all duration-300",
-                        isScrolled ? "h-8 px-3" : "h-9 px-4"
-                      )}
-                      title="Cambia password"
+                      size="icon"
+                      className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300"
+                      title="Password"
                     >
-                      <KeyRound className="h-4 w-4 shrink-0" />
-                      <span className="hidden sm:inline">Cambia password</span>
+                      <KeyRound className="h-4 w-4" />
+                      <span className="hidden sm:inline ml-2">Password</span>
                     </Button>
                   </Link>
                   <Button
                     variant="destructive"
-                    size="sm"
+                    size="icon"
                     onClick={() => signOut({ callbackUrl: "/dashboard" })}
-                    className={cn(
-                      "gap-2 font-semibold transition-all duration-300",
-                      isScrolled ? "h-8 px-3" : "h-9 px-4"
-                    )}
+                    className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300 font-semibold"
                     title="Esci"
                   >
-                    <LogOut className="h-4 w-4 shrink-0" />
-                    <span className="hidden sm:inline">Esci</span>
+                    <LogOut className="h-4 w-4" />
+                    <span className="hidden sm:inline ml-2">Esci</span>
                   </Button>
                 </>
               ) : (
                 <Button
                   variant="default"
-                  size="sm"
-                  onClick={() =>
-                    signIn(undefined, { callbackUrl: "/dashboard" })
-                  }
-                  className={cn(
-                    "gap-2 transition-all duration-300",
-                    isScrolled ? "h-8 px-3" : "h-9 px-4"
-                  )}
+                  size="icon"
+                  onClick={() => signIn(undefined, { callbackUrl: "/dashboard" })}
+                  className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300"
                   title="Accedi"
                 >
-                  <LogIn className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">Accedi</span>
+                  <LogIn className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-2">Accedi</span>
                 </Button>
               )}
             </div>
           </div>
         </div>
-        {!isScrolled && (
-          <div className="md:hidden flex flex-col gap-2 pb-3">
-            <div className="flex gap-1 overflow-x-auto -mx-4 px-4 scrollbar-hide">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  item.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname.startsWith(item.href);
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      size="sm"
-                      className={cn("gap-2 whitespace-nowrap shrink-0 px-2")}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="hidden xs:inline">{item.label}</span>
-                    </Button>
-                  </Link>
-                );
-              })}
-            </div>
-            <div className="sm:hidden flex items-center justify-end gap-1 px-1 pt-1 border-t border-border/50">
-              {user ? (
-                <>
-                  <Link href="/dashboard/change-password">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 gap-2 text-xs"
-                    >
-                      <KeyRound className="h-3.5 w-3.5" />
-                      Password
-                    </Button>
-                  </Link>
+
+        {/* Navigation Tabs Row (Mobile/Tablet only) */}
+        <div className="lg:hidden border-t py-2">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(item.href);
+              return (
+                <Link key={item.href} href={item.href} className="shrink-0">
                   <Button
-                    variant="destructive"
+                    variant={isActive ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => signOut({ callbackUrl: "/dashboard" })}
-                    className="h-8 gap-2 text-xs font-semibold"
+                    className={cn(
+                      "gap-2 whitespace-nowrap h-8 px-3 text-xs",
+                      isActive && "bg-secondary text-secondary-foreground"
+                    )}
                   >
-                    <LogOut className="h-3.5 w-3.5" />
-                    Esci
+                    <Icon className="h-3.5 w-3.5" />
+                    {item.label}
                   </Button>
-                </>
-              ) : (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => signIn(undefined, { callbackUrl: "/dashboard" })}
-                  className="h-8 gap-2 text-xs"
-                >
-                  <LogIn className="h-3.5 w-3.5" />
-                  Accedi
-                </Button>
-              )}
-            </div>
+                </Link>
+              );
+            })}
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

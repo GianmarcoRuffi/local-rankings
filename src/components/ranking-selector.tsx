@@ -225,7 +225,7 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
           value={selectedRanking ? String(selectedRanking.id) : ""}
           onValueChange={handleSelectRanking}
         >
-          <SelectTrigger className="w-[140px] sm:w-[220px] cursor-pointer">
+          <SelectTrigger className="w-[110px] xs:w-[140px] sm:w-[220px] cursor-pointer">
             <List className="h-4 w-4 mr-2 shrink-0" />
             <span className="truncate text-xs sm:text-sm">
               {selectedRanking?.name || "Seleziona classifica"}
@@ -248,51 +248,93 @@ export function RankingSelector({ onRankingChange }: RankingSelectorProps) {
         </Select>
 
         {isAuthenticated && (
-          <div className="flex items-center gap-1 px-1 border-l border-border ml-1 pl-3">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setNewName("");
-                setNewDescription("");
-                setCreateDialogOpen(true);
-              }}
-              title="Crea nuova classifica"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-1 border-l border-border ml-1 pl-2">
+            {/* Desktop Full View */}
+            <div className="hidden lg:flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  setNewName("");
+                  setNewDescription("");
+                  setCreateDialogOpen(true);
+                }}
+                title="Crea nuova classifica"
+                className="h-8 w-8"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
 
-            {selectedRanking && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCopyShareLink}
-                  title="Copia link della classifica"
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => openEditDialog(selectedRanking)}
-                  title="Modifica classifica"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                {!selectedRanking.is_default && (
+              {selectedRanking && (
+                <>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
-                    onClick={() => openDeleteDialog(selectedRanking)}
-                    title="Elimina classifica"
+                    onClick={handleCopyShareLink}
+                    title="Copia link della classifica"
+                    className="h-8 w-8"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Share2 className="h-4 w-4" />
                   </Button>
-                )}
-              </>
-            )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openEditDialog(selectedRanking)}
+                    title="Modifica classifica"
+                    className="h-8 w-8"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  {!selectedRanking.is_default && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
+                      onClick={() => openDeleteDialog(selectedRanking)}
+                      title="Elimina classifica"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Mobile/Tablet Compact View: Single "+" and "Options" */}
+            <div className="flex lg:hidden items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCreateDialogOpen(true)}
+                title="Crea nuova"
+                className="h-8 w-8"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              
+              {selectedRanking && (
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCopyShareLink}
+                    className="h-8 w-8"
+                    title="Condividi"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openEditDialog(selectedRanking)}
+                    className="h-8 w-8"
+                    title="Modifica"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

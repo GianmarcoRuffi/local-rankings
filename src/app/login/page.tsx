@@ -19,6 +19,9 @@ import { Label } from "@/components/ui/label";
 declare global {
   interface Window {
     onTurnstileSuccess?: (token: string) => void;
+    turnstile?: {
+      reset: () => void;
+    };
   }
 }
 
@@ -59,6 +62,8 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError("Username o password non corretti");
+        setCaptchaToken("");
+        window.turnstile?.reset();
       } else {
         router.push("/dashboard");
       }

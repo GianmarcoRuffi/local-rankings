@@ -495,7 +495,7 @@ export function StageRankingView() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Flag className="h-5 w-5 text-primary" />
-            Tappe - {selectedRanking.name}
+            {stages.length} Tappe - {selectedRanking.name}
           </CardTitle>
         </CardHeader>
         <CardContent>

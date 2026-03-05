@@ -14,7 +14,11 @@ export async function POST(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const rankingIdStr = searchParams.get("rankingId");
-    const rankingId = rankingIdStr ? parseInt(rankingIdStr) : null;
+    const rankingId = rankingIdStr ? Number.parseInt(rankingIdStr, 10) : null;
+
+    if (rankingIdStr && (rankingId === null || Number.isNaN(rankingId) || rankingId <= 0)) {
+      return NextResponse.json({ error: "Invalid rankingId" }, { status: 400 });
+    }
 
     if (rankingId) {
       // Reset only the specified ranking

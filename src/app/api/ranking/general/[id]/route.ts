@@ -6,6 +6,15 @@ import { generalRanking } from "@/lib/db/schema";
 import { eq, or, and, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
 
+function parsePositiveInt(value: string): number | null {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -16,13 +25,22 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const playerId = parseInt(id);
+  const playerId = parsePositiveInt(id);
+
+  if (!playerId) {
+    return NextResponse.json({ error: "Invalid player id" }, { status: 400 });
+  }
+
   const body = await request.json();
   const { name, total_points, t1, presenze, ranking_id } = body;
 
+  if (typeof name !== "string" || !name.trim()) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+
   try {
     // Get the ranking_id from the player if not provided
-    let effectiveRankingId = ranking_id ? parseInt(ranking_id) : null;
+    let effectiveRankingId = ranking_id ? Number.parseInt(ranking_id, 10) : null;
     if (!effectiveRankingId) {
       const playerRow = await db
         .select({ rankingId: generalRanking.rankingId })

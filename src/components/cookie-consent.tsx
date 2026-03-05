@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function CookieConsent() {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    // Controlla se l'utente ha già accettato i cookie (in useEffect per evitare problemi di SSR)
-    const cookieConsent = localStorage.getItem("cookieConsent");
-    if (!cookieConsent) {
-      setIsVisible(true);
+  const [isVisible, setIsVisible] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
     }
-  }, []);
+
+    return !localStorage.getItem("cookieConsent");
+  });
 
   const handleAccept = () => {
     localStorage.setItem("cookieConsent", "true");

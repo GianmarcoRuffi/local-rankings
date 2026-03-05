@@ -40,7 +40,7 @@ export function Footer() {
         <p className="transition-all duration-500">
           © Made with ❤️ by Gianmarco Ruffi 
           <span className="hidden sm:inline ml-1 italic">
-            - "Massima dedizione alla causa! (cit.)"
+            - &quot;Massima dedizione alla causa! (cit.)&quot;
           </span>
         </p>
       </div>

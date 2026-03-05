@@ -5,6 +5,12 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -13,18 +19,20 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { currentPassword, newPassword } = body;
+  const parsedBody = changePasswordSchema.safeParse(body);
 
-  if (!currentPassword || !newPassword) {
+  if (!parsedBody.success) {
     return NextResponse.json(
       { error: "Password attuale e nuova password sono obbligatorie" },
       { status: 400 }
     );
   }
 
-  if (newPassword.length < 8) {
+  const { currentPassword, newPassword } = parsedBody.data;
+
+  if (newPassword === currentPassword) {
     return NextResponse.json(
-      { error: "La nuova password deve essere di almeno 8 caratteri" },
+      { error: "La nuova password deve essere diversa da quella attuale" },
       { status: 400 }
     );
   }

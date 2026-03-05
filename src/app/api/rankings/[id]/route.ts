@@ -4,13 +4,33 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rankings, generalRanking, stages } from "@/lib/db/schema";
 import { eq, and, ne } from "drizzle-orm";
+import { z } from "zod";
+
+const updateRankingSchema = z.object({
+  name: z.string().trim().min(1),
+  description: z.string().nullable().optional(),
+  is_default: z.boolean().optional(),
+});
+
+function parsePositiveInt(value: string): number | null {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const rankingId = parseInt(id);
+  const rankingId = parsePositiveInt(id);
+
+  if (!rankingId) {
+    return NextResponse.json({ error: "Invalid ranking id" }, { status: 400 });
+  }
 
   try {
     const rows = await db
@@ -43,9 +63,20 @@ export async function PUT(
   }
 
   const { id } = await params;
-  const rankingId = parseInt(id);
+  const rankingId = parsePositiveInt(id);
+
+  if (!rankingId) {
+    return NextResponse.json({ error: "Invalid ranking id" }, { status: 400 });
+  }
+
   const body = await request.json();
-  const { name, description, is_default } = body;
+  const parsedBody = updateRankingSchema.safeParse(body);
+
+  if (!parsedBody.success) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  const { name, description, is_default } = parsedBody.data;
 
   try {
     const existing = await db
@@ -98,7 +129,11 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const rankingId = parseInt(id);
+  const rankingId = parsePositiveInt(id);
+
+  if (!rankingId) {
+    return NextResponse.json({ error: "Invalid ranking id" }, { status: 400 });
+  }
 
   try {
     const existing = await db

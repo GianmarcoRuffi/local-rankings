@@ -1,4 +1,5 @@
 import mysql from "mysql2/promise";
+import type { RowDataPacket } from "mysql2/promise";
 
 async function createDatabaseUser() {
   const rootHost = process.env.DB_ROOT_HOST || "localhost";
@@ -32,12 +33,12 @@ async function createDatabaseUser() {
     await connection.execute(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
     console.log(`✅ Database '${dbName}' created or already exists`);
 
-    const [existingUsers] = await connection.execute(
+    const [existingUsers] = await connection.execute<RowDataPacket[]>(
       `SELECT User FROM mysql.user WHERE User = ? AND Host = ?`,
       [dbUser, dbHost]
     );
 
-    if ((existingUsers as any[]).length > 0) {
+    if (existingUsers.length > 0) {
       console.log(`ℹ️  User '${dbUser}'@'${dbHost}' already exists`);
       await connection.execute(`SET PASSWORD FOR '${dbUser}'@'${dbHost}' = PASSWORD('${dbPassword}')`);
       console.log(`✅ Password updated for '${dbUser}'@'${dbHost}'`);
@@ -65,9 +66,10 @@ async function createDatabaseUser() {
     console.log("   2. Run 'npm run db:push' to create tables");
     console.log("   3. Run 'npm run db:mock' to seed test data");
 
-  } catch (error: any) {
-    console.error("❌ Error:", error.message);
-    if (error.code === "ER_ACCESS_DENIED_ERROR") {
+  } catch (error: unknown) {
+    const mysqlError = error as { message?: string; code?: string };
+    console.error("❌ Error:", mysqlError.message ?? String(error));
+    if (mysqlError.code === "ER_ACCESS_DENIED_ERROR") {
       console.log("\n💡 Tip: Make sure your root credentials are correct:");
       console.log("   Set DB_ROOT_USER and DB_ROOT_PASSWORD environment variables");
     }

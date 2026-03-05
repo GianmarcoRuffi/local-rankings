@@ -4,8 +4,29 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { stageRanking, generalRanking } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { z } from "zod";
 import { sortRanking, capitalizeName } from "@/lib/ranking-logic";
 
+const allowedOperations = new Set([
+  "sortByName",
+  "sortByPoints",
+  "capitalizeNames",
+  "recalculatePositions",
+  "multiplyScores",
+]);
+
+const allowedTargets = new Set(["stage", "general"]);
+
+const operationSchema = z.object({
+  operation: z.enum([
+    "sortByName",
+    "sortByPoints",
+    "capitalizeNames",
+    "recalculatePositions",
+    "multiplyScores",
+  ]),
+  target: z.enum(["stage", "general"]).optional(),
+});
 
 /**
  * API per operazioni di gestione tabella
@@ -24,16 +45,32 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { operation, target } = body;
+    const parsed = operationSchema.safeParse(body);
 
-    if (!operation) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "operation is required" },
+        { error: "Invalid operation payload" },
         { status: 400 }
       );
     }
 
-    const table = target === "stage" ? stageRanking : generalRanking;
+    const { operation, target } = parsed.data;
+    if (!allowedOperations.has(operation)) {
+      return NextResponse.json(
+        { error: "Invalid operation" },
+        { status: 400 }
+      );
+    }
+
+    const normalizedTarget = target ?? "general";
+    if (!allowedTargets.has(normalizedTarget)) {
+      return NextResponse.json(
+        { error: "Invalid target" },
+        { status: 400 }
+      );
+    }
+
+    const table = normalizedTarget === "stage" ? stageRanking : generalRanking;
 
     switch (operation) {
       case "sortByName": {
@@ -64,9 +101,9 @@ export async function POST(request: Request) {
         const rows = await db.select().from(table);
 
         const sorted = sortRanking(
-          rows.map((row: any) => ({
+          rows.map((row) => ({
             id: row.id,
-            total_points: Number(row.totalPoints ?? row.pointsAwarded ?? 0),
+            total_points: Number(("totalPoints" in row ? row.totalPoints : row.pointsAwarded) ?? 0),
             t1: row.t1 ?? 0,
           }))
         );
@@ -115,9 +152,9 @@ export async function POST(request: Request) {
         const rows = await db.select().from(table);
 
         const sorted = sortRanking(
-          rows.map((row: any) => ({
+          rows.map((row) => ({
             id: row.id,
-            total_points: Number(row.totalPoints ?? row.pointsAwarded ?? 0),
+            total_points: Number(("totalPoints" in row ? row.totalPoints : row.pointsAwarded) ?? 0),
             t1: row.t1 ?? 0,
           }))
         );
@@ -140,7 +177,7 @@ export async function POST(request: Request) {
 
       case "multiplyScores": {
         // Moltiplica i punteggi per 3 (per vittorie)
-        if (target !== "stage") {
+        if (normalizedTarget !== "stage") {
           return NextResponse.json(
             { error: "multiplyScores is only available for stage_ranking" },
             { status: 400 }

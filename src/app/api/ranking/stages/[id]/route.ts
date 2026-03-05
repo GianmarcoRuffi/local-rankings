@@ -5,6 +5,15 @@ import { db } from "@/lib/db";
 import { stages, stageRanking } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+function parsePositiveInt(value: string): number | null {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -15,9 +24,18 @@ export async function PUT(
   }
 
   const { id } = await params;
-  const stageId = parseInt(id);
+  const stageId = parsePositiveInt(id);
+
+  if (!stageId) {
+    return NextResponse.json({ error: "Invalid stage id" }, { status: 400 });
+  }
+
   const body = await request.json();
   const { name, date, ranking_id } = body;
+
+  if (typeof name !== "string" || !name.trim()) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
 
   try {
     const stageRows = await db
@@ -59,7 +77,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const stageId = parseInt(id);
+  const stageId = parsePositiveInt(id);
+
+  if (!stageId) {
+    return NextResponse.json({ error: "Invalid stage id" }, { status: 400 });
+  }
 
   try {
     const players = await db
@@ -87,7 +109,11 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const stageId = parseInt(id);
+  const stageId = parsePositiveInt(id);
+
+  if (!stageId) {
+    return NextResponse.json({ error: "Invalid stage id" }, { status: 400 });
+  }
 
   try {
     const stageRows = await db

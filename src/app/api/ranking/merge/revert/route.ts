@@ -4,7 +4,29 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { stages, rankings, stageRanking, generalRanking } from "@/lib/db/schema";
 import { eq, and, or, isNull, sql } from "drizzle-orm";
+import { z } from "zod";
 import { sortRanking } from "@/lib/ranking-logic";
+
+const revertMergeSchema = z.object({
+  stageId: z.union([z.number().int().positive(), z.string()]),
+});
+
+function toPositiveInt(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -13,17 +35,18 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { stageId } = body;
+  const parsedBody = revertMergeSchema.safeParse(body);
+  const stageId = parsedBody.success ? toPositiveInt(parsedBody.data.stageId) : null;
 
   if (!stageId) {
-    return NextResponse.json({ error: "stageId is required" }, { status: 400 });
+    return NextResponse.json({ error: "Valid stageId is required" }, { status: 400 });
   }
 
   try {
     const stageRows = await db
       .select()
       .from(stages)
-      .where(eq(stages.id, parseInt(stageId)))
+      .where(eq(stages.id, stageId))
       .limit(1);
 
     if (stageRows.length === 0) {
@@ -52,7 +75,7 @@ export async function POST(request: Request) {
     const stagePlayers = await db
       .select()
       .from(stageRanking)
-      .where(eq(stageRanking.stageId, parseInt(stageId)))
+      .where(eq(stageRanking.stageId, stageId))
       .orderBy(stageRanking.position);
 
     await db.transaction(async (tx) => {
@@ -101,7 +124,7 @@ export async function POST(request: Request) {
       await tx
         .update(stages)
         .set({ status: "active", updatedAt: new Date() })
-        .where(eq(stages.id, parseInt(stageId)));
+        .where(eq(stages.id, stageId));
 
       const allPlayers = await tx
         .select({ id: generalRanking.id, totalPoints: generalRanking.totalPoints, t1: generalRanking.t1 })

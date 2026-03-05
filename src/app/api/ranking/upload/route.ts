@@ -7,6 +7,41 @@ import { eq } from 'drizzle-orm';
 import { parsePdfText, capitalizeName } from '@/lib/ranking-logic';
 import PDFParser from 'pdf2json';
 
+type PdfErrorData = Error | { parserError: Error };
+
+interface PdfTextToken {
+  x: number;
+  y: number;
+  R: Array<{ T: string }>;
+}
+
+interface PdfPage {
+  Texts?: PdfTextToken[];
+}
+
+interface PdfData {
+  Pages: PdfPage[];
+}
+
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+
+function toPositiveInt(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -20,10 +55,22 @@ export async function POST(request: Request) {
     const stageName = formData.get('stageName') as string | null;
     const stageDate = formData.get('stageDate') as string | null;
     const rankingIdStr = formData.get('rankingId') as string | null;
-    const rankingId = rankingIdStr ? parseInt(rankingIdStr, 10) : null;
+    const rankingId = rankingIdStr ? toPositiveInt(rankingIdStr) : null;
+
+    if (rankingIdStr && !rankingId) {
+      return NextResponse.json({ error: 'Invalid rankingId' }, { status: 400 });
+    }
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      return NextResponse.json({ error: 'Only PDF files are supported' }, { status: 400 });
+    }
+
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 413 });
     }
 
     console.log('[PDF Upload] File received:', file.name);
@@ -35,16 +82,21 @@ export async function POST(request: Request) {
     const fullText = await new Promise<string>((resolve, reject) => {
       const pdfParser = new PDFParser();
 
-      pdfParser.on('pdfParser_dataError', (errData: any) => {
-        reject(new Error(errData.parserError));
+      pdfParser.on('pdfParser_dataError', (errData: PdfErrorData) => {
+        if (errData instanceof Error) {
+          reject(errData);
+          return;
+        }
+
+        reject(errData.parserError);
       });
 
-      pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+      pdfParser.on('pdfParser_dataReady', (pdfData: PdfData) => {
         let text = '';
 
         for (const page of pdfData.Pages) {
           const texts = page.Texts || [];
-          texts.sort((a: any, b: any) => {
+          texts.sort((a, b) => {
             // Ordina per Y poi X
             const yDiff = Math.abs(a.y - b.y);
             if (yDiff > 0.5) return a.y - b.y;
@@ -97,7 +149,11 @@ export async function POST(request: Request) {
       }
     }
 
-    const name = stageName || file.name.replace('.pdf', '');
+    const name = (stageName?.trim() || file.name.replace('.pdf', '')).trim();
+    if (!name) {
+      return NextResponse.json({ error: 'Stage name is required' }, { status: 400 });
+    }
+
     console.log('[PDF Upload] Creating stage:', name, 'for ranking:', effectiveRankingId);
     
     const result = await db.transaction(async (tx) => {

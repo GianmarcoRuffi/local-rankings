@@ -4,6 +4,13 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rankings } from "@/lib/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
+import { z } from "zod";
+
+const createRankingSchema = z.object({
+  name: z.string().trim().min(1),
+  description: z.string().nullable().optional(),
+  is_default: z.boolean().optional(),
+});
 
 export async function GET() {
   try {
@@ -29,14 +36,16 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, description, is_default } = body;
+    const parsed = createRankingSchema.safeParse(body);
 
-    if (!name || !name.trim()) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Name is required" },
+        { error: "Invalid payload" },
         { status: 400 }
       );
     }
+
+    const { name, description, is_default } = parsed.data;
 
     const result = await db.transaction(async (tx) => {
       // If this is set as default, remove default from other rankings

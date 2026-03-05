@@ -41,7 +41,6 @@ import { GeneralRankingPlayer, SortConfig } from "@/types/ranking";
 import { toast } from "@/hooks/use-toast";
 import { t1Comparator } from "@/lib/ranking-logic";
 import { useRanking } from "@/hooks/useRanking";
-import * as XLSX from "xlsx";
 
 function SortIcon({
   column,
@@ -327,31 +326,34 @@ export function GeneralRankingTable() {
   const exportToExcel = () => {
     if (sortedPlayers.length === 0) return;
 
-    const data = sortedPlayers.map((player) => ({
-      Posizione: player.position,
-      Giocatore: player.name,
-      "Punti Totali": player.total_points,
-      T1: player.t1 ?? 0,
-      Presenze: player.presenze,
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Classifica Generale");
-
-    const colWidths = [
-      { wch: 10 },
-      { wch: 25 },
-      { wch: 15 },
-      { wch: 8 },
-      { wch: 10 },
+    const rows = [
+      ["Posizione", "Giocatore", "Punti Totali", "T1", "Presenze"],
+      ...sortedPlayers.map((player) => [
+        String(player.position),
+        player.name,
+        String(player.total_points),
+        String(player.t1 ?? 0),
+        String(player.presenze),
+      ]),
     ];
-    ws["!cols"] = colWidths;
 
+    const csv = rows
+      .map((row) => row.map((value) => `"${value.replaceAll("\"", "\"\"")}"`).join(";"))
+      .join("\n");
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
     const filename = selectedRanking
-      ? `classifica_${selectedRanking.name.toLowerCase().replace(/\s+/g, "_")}.xlsx`
-      : "classifica_generale.xlsx";
-    XLSX.writeFile(wb, filename);
+      ? `classifica_${selectedRanking.name.toLowerCase().replace(/\s+/g, "_")}.csv`
+      : "classifica_generale.csv";
+
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const exportToPDF = () => {

@@ -1,24 +1,46 @@
 import PDFParser from 'pdf2json';
 import { parsePdfText, capitalizeName } from '../src/lib/ranking-logic';
 
+type PdfErrorData = Error | { parserError: Error };
+
+interface PdfTextToken {
+  x: number;
+  y: number;
+  R: Array<{ T: string }>;
+}
+
+interface PdfPage {
+  Texts?: PdfTextToken[];
+}
+
+interface PdfData {
+  Pages: PdfPage[];
+}
+
 async function testPdf() {
   const pdfPath = './local 4 febbraio 2025.pdf';
 
   const pdfParser = new PDFParser();
 
-  return new Promise((resolve, reject) => {
-    pdfParser.on('pdfParser_dataError', (errData: any) => {
-      console.error('Error parsing PDF:', errData.parserError);
+  return new Promise<ReturnType<typeof parsePdfText>>((resolve, reject) => {
+    pdfParser.on('pdfParser_dataError', (errData: PdfErrorData) => {
+      if (errData instanceof Error) {
+        console.error('Error parsing PDF:', errData.message);
+        reject(errData);
+        return;
+      }
+
+      console.error('Error parsing PDF:', errData.parserError.message);
       reject(errData.parserError);
     });
 
-    pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+    pdfParser.on('pdfParser_dataReady', (pdfData: PdfData) => {
       // Estrai il testo
       let fullText = '';
 
       for (const page of pdfData.Pages) {
         const texts = page.Texts || [];
-        texts.sort((a: any, b: any) => {
+        texts.sort((a, b) => {
           // Ordina per Y poi X
           const yDiff = Math.abs(a.y - b.y);
           if (yDiff > 0.5) return a.y - b.y;

@@ -17,28 +17,37 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL 
-  ? (process.env.NEXT_PUBLIC_BASE_URL.startsWith('http') 
-      ? process.env.NEXT_PUBLIC_BASE_URL 
+// Site configuration constants for consistent metadata
+const siteConfig = {
+  title: "Rankings Manager",
+  description: "visualizza e gestisci le classifiche generali dei tornei.",
+};
+
+// Enhanced base URL logic supporting various environments
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+  ? (process.env.NEXT_PUBLIC_BASE_URL.startsWith('http')
+      ? process.env.NEXT_PUBLIC_BASE_URL
       : `https://${process.env.NEXT_PUBLIC_BASE_URL}`)
-  : "http://localhost:3080";
+  : process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3080";
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
-  title: "Rankings Manager",
-  description: "visualizza e gestisci le classifiche generali dei tornei.",
+  title: siteConfig.title,
+  description: siteConfig.description,
   openGraph: {
-    title: "Rankings Manager",
-    description: "visualizza e gestisci le classifiche generali dei tornei.",
+    title: siteConfig.title,
+    description: siteConfig.description,
     url: "./",
-    siteName: "Rankings Manager",
+    siteName: siteConfig.title,
     locale: "it_IT",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Rankings Manager",
-    description: "visualizza e gestisci le classifiche generali dei tornei.",
+    title: siteConfig.title,
+    description: siteConfig.description,
   },
 };
 

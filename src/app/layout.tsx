@@ -19,7 +19,26 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Rankings Manager",
-  description: "Gestionale classifiche tornei",
+  description: "visualizza e gestisci le classifiche generali dei tornei.",
+  openGraph: {
+    title: "Rankings Manager",
+    description: "visualizza e gestisci le classifiche generali dei tornei.",
+    images: [
+      {
+        url: "/icon.svg",
+        width: 32,
+        height: 32,
+        alt: "Rankings Manager Trophy",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Rankings Manager",
+    description: "visualizza e gestisci le classifiche generali dei tornei.",
+    images: ["/icon.svg"],
+  },
 };
 
 export default function RootLayout({

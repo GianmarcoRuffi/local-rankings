@@ -17,27 +17,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL 
+  ? (process.env.NEXT_PUBLIC_BASE_URL.startsWith('http') 
+      ? process.env.NEXT_PUBLIC_BASE_URL 
+      : `https://${process.env.NEXT_PUBLIC_BASE_URL}`)
+  : "http://localhost:3080";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(baseUrl),
   title: "Rankings Manager",
   description: "visualizza e gestisci le classifiche generali dei tornei.",
   openGraph: {
     title: "Rankings Manager",
     description: "visualizza e gestisci le classifiche generali dei tornei.",
-    images: [
-      {
-        url: "/icon.svg",
-        width: 32,
-        height: 32,
-        alt: "Rankings Manager Trophy",
-      },
-    ],
+    url: "./",
+    siteName: "Rankings Manager",
+    locale: "it_IT",
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Rankings Manager",
     description: "visualizza e gestisci le classifiche generali dei tornei.",
-    images: ["/icon.svg"],
   },
 };
 

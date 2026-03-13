@@ -5,6 +5,7 @@ export interface Ranking {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface GeneralRankingPlayer {
@@ -17,6 +18,7 @@ export interface GeneralRankingPlayer {
   presenze: number;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface StageRankingPlayer {
@@ -40,6 +42,7 @@ export interface Stage {
   status: "pending" | "active" | "merged";
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 export interface SortConfig {

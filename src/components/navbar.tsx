@@ -12,6 +12,7 @@ import {
   User,
   LogIn,
   KeyRound,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,11 @@ const privateNavItems = [
     href: "/dashboard/upload",
     label: "Aggiungi tappe",
     icon: Upload,
+  },
+  {
+    href: "/dashboard/trash",
+    label: "Cestino",
+    icon: Trash2,
   },
 ];
 

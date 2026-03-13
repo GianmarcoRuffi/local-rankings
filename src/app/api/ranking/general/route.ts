@@ -12,6 +12,9 @@ export async function GET(request: Request) {
 
     const query = db.select().from(generalRanking);
 
+    // Exclude soft-deleted entries
+    query.where(isNull(generalRanking.deletedAt));
+
     if (rankingId) {
       // Include entries for this specific ranking
       query.where(

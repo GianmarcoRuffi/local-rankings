@@ -21,9 +21,10 @@ export async function POST(request: Request) {
     }
 
     if (rankingId) {
-      // Reset only the specified ranking
+      // Soft delete only the specified ranking's general ranking entries
       await db
-        .delete(generalRanking)
+        .update(generalRanking)
+        .set({ deletedAt: new Date() })
         .where(
           or(
             eq(generalRanking.rankingId, rankingId),
@@ -33,11 +34,13 @@ export async function POST(request: Request) {
             )
           )
         );
-      return NextResponse.json({ success: true, message: "Classifica azzerata" });
+      return NextResponse.json({ success: true, message: "Classifica azzerata (spostata nel cestino)" });
     } else {
-      // Reset all rankings (legacy behavior)
-      await db.delete(generalRanking);
-      return NextResponse.json({ success: true, message: "Tutte le classifiche azzerate" });
+      // Soft delete all rankings (legacy behavior)
+      await db
+        .update(generalRanking)
+        .set({ deletedAt: new Date() });
+      return NextResponse.json({ success: true, message: "Tutte le classifiche azzerate (spostate nel cestino)" });
     }
   } catch (error) {
     console.error("Error resetting general ranking:", error);

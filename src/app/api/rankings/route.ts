@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rankings } from "@/lib/db/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 const createRankingSchema = z.object({
@@ -17,6 +17,7 @@ export async function GET() {
     const rows = await db
       .select()
       .from(rankings)
+      .where(isNull(rankings.deletedAt))
       .orderBy(desc(rankings.isDefault), asc(rankings.name));
     return NextResponse.json(rows);
   } catch (error) {

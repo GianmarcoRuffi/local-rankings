@@ -42,8 +42,12 @@ export const rankings = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    deletedAt: timestamp("deleted_at"),
   },
-  (table) => [index("idx_is_default").on(table.isDefault)]
+  (table) => [
+    index("idx_is_default").on(table.isDefault),
+    index("idx_rankings_deleted_at").on(table.deletedAt),
+  ]
 );
 
 export const stages = pgTable(
@@ -60,11 +64,13 @@ export const stages = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    deletedAt: timestamp("deleted_at"),
   },
   (table) => [
     index("idx_status").on(table.status),
     index("idx_created_at").on(table.createdAt),
     index("idx_ranking_id").on(table.rankingId),
+    index("idx_stages_deleted_at").on(table.deletedAt),
   ]
 );
 
@@ -102,11 +108,13 @@ export const generalRanking = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    deletedAt: timestamp("deleted_at"),
   },
   (table) => [
     index("idx_total_points").on(table.totalPoints),
     index("idx_name").on(table.name),
     index("idx_general_position").on(table.position),
     index("idx_gr_ranking_id").on(table.rankingId),
+    index("idx_general_ranking_deleted_at").on(table.deletedAt),
   ]
 );

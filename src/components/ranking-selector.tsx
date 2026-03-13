@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Plus, Trash2, Pencil, Trophy, List, Share2 } from "lucide-react";
@@ -23,6 +23,11 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useRanking } from "@/hooks/useRanking";
 import { Ranking } from "@/types/ranking";
 import { toast } from "@/hooks/use-toast";
@@ -30,6 +35,12 @@ import { toast } from "@/hooks/use-toast";
 interface RankingSelectorProps {
   onRankingChange?: (ranking: Ranking | null) => void;
   className?: string;
+}
+
+interface HasActiveDataResult {
+  hasActiveData: boolean;
+  hasGeneralEntries: boolean;
+  hasStages: boolean;
 }
 
 export function RankingSelector({ onRankingChange, className }: RankingSelectorProps) {
@@ -49,6 +60,34 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
   const [newDescription, setNewDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [checkingData, setCheckingData] = useState(false);
+  const [hasActiveData, setHasActiveData] = useState(false);
+
+  const checkActiveData = useCallback(async (rankingId: number): Promise<HasActiveDataResult> => {
+    try {
+      const res = await fetch(`/api/rankings/${rankingId}/check-data`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (error) {
+      console.error("Error checking active data:", error);
+    }
+    return { hasActiveData: false, hasGeneralEntries: false, hasStages: false };
+  }, []);
+
+  useEffect(() => {
+    const checkData = async () => {
+      if (selectedRanking && !selectedRanking.is_default) {
+        setCheckingData(true);
+        const result = await checkActiveData(selectedRanking.id);
+        setHasActiveData(result.hasActiveData);
+        setCheckingData(false);
+      } else {
+        setHasActiveData(false);
+      }
+    };
+    checkData();
+  }, [selectedRanking, checkActiveData]);
 
   const handleSelectRanking = (rankingId: string) => {
     const ranking = rankings.find((r) => String(r.id) === rankingId);
@@ -166,7 +205,7 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
       if (res.ok) {
         toast({
           title: "Classifica eliminata",
-          description: `La classifica "${rankingToDelete.name}" è stata eliminata.`,
+          description: `La classifica "${rankingToDelete.name}" è stata spostata nel cestino.`,
           variant: "success" as Parameters<typeof toast>[0]["variant"],
         });
         setDeleteDialogOpen(false);
@@ -219,6 +258,8 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
       });
     }
   };
+
+  const canDelete = selectedRanking && !selectedRanking.is_default;
 
   return (
     <>
@@ -290,16 +331,43 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  {!selectedRanking.is_default && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
-                      onClick={() => openDeleteDialog(selectedRanking)}
-                      title="Elimina classifica"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  {canDelete && (
+                    checkingData ? (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 border-destructive/30"
+                        disabled
+                      >
+                        <div className="h-4 w-4 border-2 border-destructive/30 border-t-destructive rounded-full animate-spin" />
+                      </Button>
+                    ) : hasActiveData ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 border-destructive/30 text-destructive/50 cursor-not-allowed"
+                            disabled
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Non è possibile cancellare un circuito contenente dei dati</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
+                        onClick={() => openDeleteDialog(selectedRanking)}
+                        title="Elimina classifica (sposta nel cestino)"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )
                   )}
                 </>
               )}
@@ -337,6 +405,17 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
+                  {canDelete && !checkingData && !hasActiveData && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openDeleteDialog(selectedRanking)}
+                      className="h-8 w-8"
+                      title="Elimina"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -447,10 +526,10 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
             </DialogTitle>
             <DialogDescription>
               Stai per eliminare la classifica{" "}
-              <strong>&quot;{rankingToDelete?.name}&quot;</strong>. Questa
-              operazione è <strong>irreversibile</strong>: tutti i dati della
-              classifica generale verranno eliminati. Le tappe associate
-              verranno scollegate ma non eliminate.
+              <strong>&quot;{rankingToDelete?.name}&quot;</strong>. La classifica
+              verrà spostata nel cestino e potrà essere ripristinata entro 5 giorni.
+              Tutti i dati della classifica generale e le tappe verranno anch&apos;essi
+              spostati nel cestino.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -466,7 +545,17 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
               onClick={handleDelete}
               disabled={deleting}
             >
-              {deleting ? "Eliminazione..." : "Elimina"}
+              {deleting ? (
+                <>
+                  <div className="h-4 w-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Eliminazione...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Sì, sposta nel cestino
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

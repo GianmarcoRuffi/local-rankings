@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rankings, generalRanking, stages, stageRanking } from "@/lib/db/schema";
-import { eq, not, isNull, desc, inArray } from "drizzle-orm";
+import { eq, not, isNull, desc, inArray, and } from "drizzle-orm";
 import { z } from "zod";
 
 const restoreRankingSchema = z.object({
@@ -14,12 +14,28 @@ const restoreGeneralEntrySchema = z.object({
   entryId: z.number().positive(),
 });
 
+const restoreGeneralRankingSchema = z.object({
+  rankingId: z.number().positive(),
+});
+
 const deletePermanentlyRankingSchema = z.object({
   rankingId: z.number().positive(),
 });
 
 const deletePermanentlyGeneralEntrySchema = z.object({
   entryId: z.number().positive(),
+});
+
+const deletePermanentlyGeneralRankingSchema = z.object({
+  rankingId: z.number().positive(),
+});
+
+const restoreStageSchema = z.object({
+  stageId: z.number().positive(),
+});
+
+const deletePermanentlyStageSchema = z.object({
+  stageId: z.number().positive(),
 });
 
 export async function GET() {
@@ -36,12 +52,49 @@ export async function GET() {
       .where(not(isNull(rankings.deletedAt)))
       .orderBy(desc(rankings.deletedAt));
 
-    // Get deleted general ranking entries
+    // Get deleted general ranking entries grouped by rankingId
     const deletedGeneralEntries = await db
       .select()
       .from(generalRanking)
       .where(not(isNull(generalRanking.deletedAt)))
       .orderBy(desc(generalRanking.deletedAt));
+
+    // Group entries by rankingId
+    const generalRankingGroups: Record<number, typeof deletedGeneralEntries> = {};
+    const ungroupedEntries: typeof deletedGeneralEntries = [];
+
+    for (const entry of deletedGeneralEntries) {
+      if (entry.rankingId) {
+        if (!generalRankingGroups[entry.rankingId]) {
+          generalRankingGroups[entry.rankingId] = [];
+        }
+        generalRankingGroups[entry.rankingId].push(entry);
+      } else {
+        ungroupedEntries.push(entry);
+      }
+    }
+
+    // Get ranking names for groups
+    const rankingIds = Object.keys(generalRankingGroups).map(Number);
+    let rankingNames: Record<number, string> = {};
+    if (rankingIds.length > 0) {
+      const rankingData = await db
+        .select({ id: rankings.id, name: rankings.name })
+        .from(rankings)
+        .where(inArray(rankings.id, rankingIds));
+      rankingNames = Object.fromEntries(rankingData.map(r => [r.id, r.name]));
+    }
+
+    // Create grouped items
+    const generalRankingGroupsWithInfo = Object.entries(generalRankingGroups).map(([rankingId, entries]) => ({
+      type: "generalRankingGroup" as const,
+      rankingId: Number(rankingId),
+      rankingName: rankingNames[Number(rankingId)] || `Circuito #${rankingId}`,
+      entryCount: entries.length,
+      deletedAt: entries[0]?.deletedAt,
+      totalPoints: entries.reduce((sum, e) => sum + (e.totalPoints || 0), 0),
+      entries: entries,
+    }));
 
     // Get deleted stages
     const deletedStages = await db
@@ -52,7 +105,8 @@ export async function GET() {
 
     return NextResponse.json({
       rankings: deletedRankings,
-      generalRanking: deletedGeneralEntries,
+      generalRankingGroups: generalRankingGroupsWithInfo,
+      generalRankingUngrouped: ungroupedEntries,
       stages: deletedStages,
     });
   } catch (error) {
@@ -132,6 +186,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: "Entry ripristinata" });
     }
 
+    if (action === "restoreGeneralRanking") {
+      const parsed = restoreGeneralRankingSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      }
+
+      const { rankingId } = parsed.data;
+
+      // Restore all general ranking entries for this ranking
+      await db
+        .update(generalRanking)
+        .set({ deletedAt: null })
+        .where(
+          and(
+            eq(generalRanking.rankingId, rankingId),
+            not(isNull(generalRanking.deletedAt))
+          )
+        );
+
+      return NextResponse.json({ success: true, message: "Classifica generale ripristinata" });
+    }
+
     if (action === "deletePermanentlyRanking") {
       const parsed = deletePermanentlyRankingSchema.safeParse(body);
       if (!parsed.success) {
@@ -189,6 +265,67 @@ export async function POST(request: Request) {
         .where(eq(generalRanking.id, entryId));
 
       return NextResponse.json({ success: true, message: "Entry eliminata definitivamente" });
+    }
+
+    if (action === "deletePermanentlyGeneralRanking") {
+      const parsed = deletePermanentlyGeneralRankingSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      }
+
+      const { rankingId } = parsed.data;
+
+      // Delete all general ranking entries for this ranking permanently
+      await db
+        .delete(generalRanking)
+        .where(
+          and(
+            eq(generalRanking.rankingId, rankingId),
+            not(isNull(generalRanking.deletedAt))
+          )
+        );
+
+      return NextResponse.json({ success: true, message: "Classifica generale eliminata definitivamente" });
+    }
+
+    if (action === "restoreStage") {
+      const parsed = restoreStageSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      }
+
+      const { stageId } = parsed.data;
+
+      // Restore the stage
+      await db
+        .update(stages)
+        .set({ deletedAt: null })
+        .where(eq(stages.id, stageId));
+
+      return NextResponse.json({ success: true, message: "Tappa ripristinata" });
+    }
+
+    if (action === "deletePermanentlyStage") {
+      const parsed = deletePermanentlyStageSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      }
+
+      const { stageId } = parsed.data;
+
+      await db.transaction(async (tx) => {
+        // Delete all players from this stage
+        await tx
+          .delete(stageRanking)
+          .where(eq(stageRanking.stageId, stageId));
+
+        // Delete the stage permanently
+        await tx
+          .delete(stages)
+          .where(eq(stages.id, stageId));
+      });
+
+      return NextResponse.json({ success: true, message: "Tappa eliminata definitivamente" });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

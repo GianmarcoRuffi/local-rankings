@@ -9,6 +9,7 @@ import {
   Trophy,
   BarChart3,
   RefreshCw,
+  Users,
 } from "lucide-react";
 import {
   Card,
@@ -19,25 +20,54 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-interface TrashItem {
+interface RankingItem {
   id: number;
   name: string;
   deletedAt: string;
-  type: "ranking" | "generalEntry" | "stage";
-  rankingId?: number | null;
-  totalPoints?: number;
-  name2?: string;
+  type: "ranking";
 }
+
+interface GeneralRankingGroup {
+  rankingId: number;
+  rankingName: string;
+  entryCount: number;
+  deletedAt: string;
+  totalPoints: number;
+  type: "generalRankingGroup";
+}
+
+interface StageItem {
+  id: number;
+  name: string;
+  deletedAt: string;
+  type: "stage";
+}
+
+type TrashItem = RankingItem | GeneralRankingGroup | StageItem;
 
 export default function TrashPage() {
   const { data: session } = useSession();
   const isAuthenticated = !!session;
-  const [rankings, setRankings] = useState<TrashItem[]>([]);
-  const [generalEntries, setGeneralEntries] = useState<TrashItem[]>([]);
+  const [rankings, setRankings] = useState<RankingItem[]>([]);
+  const [generalGroups, setGeneralGroups] = useState<GeneralRankingGroup[]>([]);
+  const [stages, setStages] = useState<StageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
+  
+  // Modale di conferma
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<TrashItem | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"restore" | "delete" | null>(null);
 
   const fetchTrash = useCallback(async () => {
     setLoading(true);
@@ -47,29 +77,39 @@ export default function TrashPage() {
         const data = await res.json();
         
         // Transform rankings
-        const transformedRankings: TrashItem[] = data.rankings.map(
+        const transformedRankings: RankingItem[] = data.rankings.map(
           (r: { id: number; name: string; deletedAt: Date }) => ({
             id: r.id,
             name: r.name,
             deletedAt: r.deletedAt,
-            type: "ranking",
+            type: "ranking" as const,
           })
         );
         setRankings(transformedRankings);
 
-        // Transform general ranking entries
-        const transformedGeneral: TrashItem[] = data.generalRanking.map(
-          (e: { id: number; rankingId: number | null; name: string; totalPoints: number; deletedAt: Date }) => ({
-            id: e.id,
-            name: e.name,
-            name2: e.name,
-            totalPoints: e.totalPoints,
-            rankingId: e.rankingId,
-            deletedAt: e.deletedAt,
-            type: "generalEntry",
+        // Transform general ranking groups
+        const transformedGroups: GeneralRankingGroup[] = data.generalRankingGroups?.map(
+          (g: { rankingId: number; rankingName: string; entryCount: number; deletedAt: Date; totalPoints: number }) => ({
+            rankingId: g.rankingId,
+            rankingName: g.rankingName,
+            entryCount: g.entryCount,
+            deletedAt: g.deletedAt,
+            totalPoints: g.totalPoints,
+            type: "generalRankingGroup" as const,
           })
-        );
-        setGeneralEntries(transformedGeneral);
+        ) || [];
+        setGeneralGroups(transformedGroups);
+
+        // Transform stages
+        const transformedStages: StageItem[] = data.stages?.map(
+          (s: { id: number; name: string; deletedAt: Date }) => ({
+            id: s.id,
+            name: s.name,
+            deletedAt: s.deletedAt,
+            type: "stage" as const,
+          })
+        ) || [];
+        setStages(transformedStages);
       }
     } catch (error) {
       console.error("Error fetching trash:", error);
@@ -84,8 +124,29 @@ export default function TrashPage() {
     }
   }, [isAuthenticated, fetchTrash]);
 
-  const handleRestore = async (item: TrashItem) => {
-    setRestoring(item.id);
+  const openConfirmDialog = (item: TrashItem, action: "restore" | "delete") => {
+    setItemToDelete(item);
+    setConfirmAction(action);
+    setConfirmDialogOpen(true);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!itemToDelete || !confirmAction) return;
+
+    if (confirmAction === "restore") {
+      await executeRestore(itemToDelete);
+    } else {
+      await executeDelete(itemToDelete);
+    }
+    
+    setConfirmDialogOpen(false);
+    setItemToDelete(null);
+    setConfirmAction(null);
+  };
+
+  const executeRestore = async (item: TrashItem) => {
+    const itemId = item.type === "generalRankingGroup" ? item.rankingId : item.id;
+    setRestoring(itemId);
     try {
       let res;
       if (item.type === "ranking") {
@@ -97,13 +158,22 @@ export default function TrashPage() {
             rankingId: item.id,
           }),
         });
-      } else if (item.type === "generalEntry") {
+      } else if (item.type === "generalRankingGroup") {
         res = await fetch("/api/ranking/trash", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: "restoreGeneralEntry",
-            entryId: item.id,
+            action: "restoreGeneralRanking",
+            rankingId: item.rankingId,
+          }),
+        });
+      } else if (item.type === "stage") {
+        res = await fetch("/api/ranking/trash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "restoreStage",
+            stageId: item.id,
           }),
         });
       }
@@ -111,7 +181,7 @@ export default function TrashPage() {
       if (res?.ok) {
         toast({
           title: "Ripristinato",
-          description: `${item.name} è stato ripristinato.`,
+          description: getItemName(item) + " è stato ripristinato.",
           variant: "success" as Parameters<typeof toast>[0]["variant"],
         });
         await fetchTrash();
@@ -128,8 +198,9 @@ export default function TrashPage() {
     }
   };
 
-  const handleDeletePermanently = async (item: TrashItem) => {
-    setDeleting(item.id);
+  const executeDelete = async (item: TrashItem) => {
+    const itemId = item.type === "generalRankingGroup" ? item.rankingId : item.id;
+    setDeleting(itemId);
     try {
       let res;
       if (item.type === "ranking") {
@@ -141,13 +212,22 @@ export default function TrashPage() {
             rankingId: item.id,
           }),
         });
-      } else if (item.type === "generalEntry") {
+      } else if (item.type === "generalRankingGroup") {
         res = await fetch("/api/ranking/trash", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: "deletePermanentlyGeneralEntry",
-            entryId: item.id,
+            action: "deletePermanentlyGeneralRanking",
+            rankingId: item.rankingId,
+          }),
+        });
+      } else if (item.type === "stage") {
+        res = await fetch("/api/ranking/trash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "deletePermanentlyStage",
+            stageId: item.id,
           }),
         });
       }
@@ -155,7 +235,7 @@ export default function TrashPage() {
       if (res?.ok) {
         toast({
           title: "Eliminato",
-          description: `${item.name} è stato eliminato definitivamente.`,
+          description: getItemName(item) + " è stato eliminato definitivamente.",
           variant: "success" as Parameters<typeof toast>[0]["variant"],
         });
         await fetchTrash();
@@ -170,6 +250,12 @@ export default function TrashPage() {
     } finally {
       setDeleting(null);
     }
+  };
+
+  const getItemName = (item: TrashItem): string => {
+    if (item.type === "ranking") return item.name;
+    if (item.type === "generalRankingGroup") return item.rankingName;
+    return item.name;
   };
 
   const formatDate = (dateStr: string) => {
@@ -195,7 +281,7 @@ export default function TrashPage() {
     );
   }
 
-  const hasItems = rankings.length > 0 || generalEntries.length > 0;
+  const hasItems = rankings.length > 0 || generalGroups.length > 0 || stages.length > 0;
 
   return (
     <div className="space-y-6">
@@ -261,7 +347,7 @@ export default function TrashPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRestore(item)}
+                          onClick={() => openConfirmDialog(item, "restore")}
                           disabled={restoring === item.id}
                           title="Ripristina"
                         >
@@ -271,7 +357,7 @@ export default function TrashPage() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => handleDeletePermanently(item)}
+                          onClick={() => openConfirmDialog(item, "delete")}
                           disabled={deleting === item.id}
                           title="Elimina definitivamente"
                         >
@@ -285,31 +371,93 @@ export default function TrashPage() {
             </Card>
           )}
 
-          {/* General Entries in Trash */}
-          {generalEntries.length > 0 && (
+          {/* General Ranking Groups in Trash */}
+          {generalGroups.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <BarChart3 className="h-5 w-5 text-blue-500" />
                   Dati Classifica Generale
                   <Badge variant="secondary" className="ml-2">
-                    {generalEntries.length}
+                    {generalGroups.length}
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {generalEntries.map((item) => (
+                  {generalGroups.map((item) => (
                     <div
-                      key={`entry-${item.id}`}
+                      key={`group-${item.rankingId}`}
                       className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                        <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
+                          <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{item.rankingName}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{item.entryCount} giocatori</span>
+                            <span>•</span>
+                            <span>{item.totalPoints} punti totali</span>
+                            <span>•</span>
+                            <span>Eliminato il {formatDate(item.deletedAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openConfirmDialog(item, "restore")}
+                          disabled={restoring === item.rankingId}
+                          title="Ripristina tutta la classifica"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          {restoring === item.rankingId ? "Ripristino..." : "Ripristina"}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => openConfirmDialog(item, "delete")}
+                          disabled={deleting === item.rankingId}
+                          title="Elimina definitivamente"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Stages in Trash */}
+          {stages.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Trophy className="h-5 w-5 text-green-500" />
+                  Tappe
+                  <Badge variant="secondary" className="ml-2">
+                    {stages.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {stages.map((item) => (
+                    <div
+                      key={`stage-${item.id}`}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Trophy className="h-5 w-5 text-muted-foreground" />
                         <div>
                           <p className="font-medium">{item.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {item.totalPoints} punti • Eliminato il {formatDate(item.deletedAt)}
+                            Eliminato il {formatDate(item.deletedAt)}
                           </p>
                         </div>
                       </div>
@@ -317,7 +465,7 @@ export default function TrashPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRestore(item)}
+                          onClick={() => openConfirmDialog(item, "restore")}
                           disabled={restoring === item.id}
                           title="Ripristina"
                         >
@@ -327,7 +475,7 @@ export default function TrashPage() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => handleDeletePermanently(item)}
+                          onClick={() => openConfirmDialog(item, "delete")}
                           disabled={deleting === item.id}
                           title="Elimina definitivamente"
                         >
@@ -347,6 +495,87 @@ export default function TrashPage() {
           </div>
         </div>
       )}
+
+      {/* Dialog di conferma */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              {confirmAction === "delete" ? (
+                <>
+                  <Trash2 className="h-5 w-5" />
+                  Conferma eliminazione definitiva
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-5 w-5" />
+                  Conferma ripristino
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmAction === "delete" ? (
+                <>
+                  Stai per eliminare definitivamente <strong>&quot;{itemToDelete ? getItemName(itemToDelete) : ""}&quot;</strong>.
+                  {itemToDelete?.type === "generalRankingGroup" && (
+                    <> Questa azione eliminerà <strong>{(itemToDelete as GeneralRankingGroup).entryCount} giocatori</strong> in modo permanente.</>
+                  )}
+                  {" "}Questa operazione è <strong>irreversibile</strong>.
+                </>
+              ) : (
+                <>
+                  Stai per ripristinare <strong>&quot;{itemToDelete ? getItemName(itemToDelete) : ""}&quot;</strong>.
+                  {itemToDelete?.type === "generalRankingGroup" && (
+                    <> Verranno ripristinati <strong>{(itemToDelete as GeneralRankingGroup).entryCount} giocatori</strong>.</>
+                  )}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmDialogOpen(false);
+                setItemToDelete(null);
+                setConfirmAction(null);
+              }}
+              disabled={restoring !== null || deleting !== null}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant={confirmAction === "delete" ? "destructive" : "default"}
+              onClick={handleConfirmAction}
+              disabled={restoring !== null || deleting !== null}
+            >
+              {confirmAction === "delete" ? (
+                deleting !== null ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Eliminazione...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Sì, elimina definitivamente
+                  </>
+                )
+              ) : restoring !== null ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Ripristino...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Sì, ripristina
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

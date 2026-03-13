@@ -211,6 +211,30 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
         setDeleteDialogOpen(false);
         setRankingToDelete(null);
         await refreshRankings();
+        
+        // Se il circuito eliminato era quello selezionato, seleziona un altro circuito
+        if (selectedRanking?.id === rankingToDelete.id) {
+          // Dopo refreshRankings, rankings sarà aggiornato
+          // Cerchiamo il circuito default o il primo disponibile
+          const remainingRankings = rankings.filter(r => r.id !== rankingToDelete.id);
+          if (remainingRankings.length > 0) {
+            const defaultRanking = remainingRankings.find(r => r.is_default) || remainingRankings[0];
+            setSelectedRanking(defaultRanking);
+            onRankingChange?.(defaultRanking);
+            
+            // Aggiorna URL
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("rankingId", String(defaultRanking.id));
+            router.push(`${pathname}?${params.toString()}`);
+          } else {
+            // Non ci sono più circuiti
+            setSelectedRanking(null);
+            onRankingChange?.(null);
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete("rankingId");
+            router.push(`${pathname}?${params.toString()}`);
+          }
+        }
       } else {
         const data = await res.json();
         toast({

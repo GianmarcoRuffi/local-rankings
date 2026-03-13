@@ -222,9 +222,10 @@ export function GeneralRankingTable() {
       if (res.ok) {
         toast({
           title: "Classifica azzerata",
-          description: "Tutti i dati della classifica sono stati eliminati.",
+          description: "Tutti i dati della classifica sono stati spostati nel cestino.",
           variant: "success" as Parameters<typeof toast>[0]["variant"],
         });
+        // Aggiorna immediatamente la lista locale
         setPlayers([]);
         setResetDialogOpen(false);
       } else {

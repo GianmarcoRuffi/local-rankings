@@ -153,8 +153,12 @@ export async function DELETE(
       );
     }
 
-    // Check for active (non-deleted) data in the circuit
-    // Check general ranking entries not soft-deleted
+    // Check for active (non-deleted) data in the circuit if the user is trying to delete it
+    // Actually, we want to allow cascading soft delete, so we can comment or remove this block
+    // based on the requirement to allow easy trash movement.
+    // The review suggests that the block below prevents cascading soft-delete from ever executing.
+    
+    /* 
     const activeGeneralEntries = await db
       .select()
       .from(generalRanking)
@@ -166,7 +170,6 @@ export async function DELETE(
       )
       .limit(1);
 
-    // Check stages not soft-deleted
     const activeStages = await db
       .select()
       .from(stages)
@@ -178,7 +181,6 @@ export async function DELETE(
       )
       .limit(1);
 
-    // If there is active data, prevent deletion
     if (activeGeneralEntries.length > 0 || activeStages.length > 0) {
       return NextResponse.json(
         { 
@@ -188,33 +190,38 @@ export async function DELETE(
         { status: 400 }
       );
     }
+    */
 
-    // Perform soft delete on the ranking
-    await db
-      .update(rankings)
-      .set({ deletedAt: new Date() })
-      .where(eq(rankings.id, rankingId));
+    // Perform soft delete on the ranking and its related data in a transaction
+    await db.transaction(async (tx) => {
+      // Soft delete the ranking
+      await tx
+        .update(rankings)
+        .set({ deletedAt: new Date() })
+        .where(eq(rankings.id, rankingId));
 
-    // Also soft delete any remaining data (even if already soft-deleted, we can update their deletedAt if null)
-    await db
-      .update(generalRanking)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          eq(generalRanking.rankingId, rankingId),
-          isNull(generalRanking.deletedAt)
-        )
-      );
+      // Soft delete any associated general ranking data
+      await tx
+        .update(generalRanking)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(generalRanking.rankingId, rankingId),
+            isNull(generalRanking.deletedAt)
+          )
+        );
 
-    await db
-      .update(stages)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          eq(stages.rankingId, rankingId),
-          isNull(stages.deletedAt)
-        )
-      );
+      // Soft delete any associated stages
+      await tx
+        .update(stages)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(stages.rankingId, rankingId),
+            isNull(stages.deletedAt)
+          )
+        );
+    });
 
     return NextResponse.json({
       success: true,

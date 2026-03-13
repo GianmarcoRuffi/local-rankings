@@ -1,5 +1,10 @@
-CREATE TYPE "public"."status" AS ENUM('pending', 'active', 'merged');--> statement-breakpoint
-CREATE TABLE "general_ranking" (
+DO $$ BEGIN
+    CREATE TYPE "public"."status" AS ENUM('pending', 'active', 'merged');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "general_ranking" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"ranking_id" integer,
 	"position" integer DEFAULT 0,
@@ -11,7 +16,7 @@ CREATE TABLE "general_ranking" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "rankings" (
+CREATE TABLE IF NOT EXISTS "rankings" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(200) NOT NULL,
 	"description" text,
@@ -21,7 +26,7 @@ CREATE TABLE "rankings" (
 	CONSTRAINT "rankings_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
-CREATE TABLE "stage_ranking" (
+CREATE TABLE IF NOT EXISTS "stage_ranking" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"stage_id" integer NOT NULL,
 	"position" integer NOT NULL,
@@ -33,7 +38,7 @@ CREATE TABLE "stage_ranking" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "stages" (
+CREATE TABLE IF NOT EXISTS "stages" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"ranking_id" integer,
 	"name" varchar(200) NOT NULL,
@@ -44,7 +49,7 @@ CREATE TABLE "stages" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"username" varchar(100) NOT NULL,
 	"password_hash" varchar(255) NOT NULL,
@@ -54,14 +59,14 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_username_unique" UNIQUE("username")
 );
 --> statement-breakpoint
-CREATE INDEX "idx_total_points" ON "general_ranking" USING btree ("total_points");--> statement-breakpoint
-CREATE INDEX "idx_name" ON "general_ranking" USING btree ("name");--> statement-breakpoint
-CREATE INDEX "idx_general_position" ON "general_ranking" USING btree ("position");--> statement-breakpoint
-CREATE INDEX "idx_gr_ranking_id" ON "general_ranking" USING btree ("ranking_id");--> statement-breakpoint
-CREATE INDEX "idx_is_default" ON "rankings" USING btree ("is_default");--> statement-breakpoint
-CREATE INDEX "idx_stage_id" ON "stage_ranking" USING btree ("stage_id");--> statement-breakpoint
-CREATE INDEX "idx_stage_position" ON "stage_ranking" USING btree ("position");--> statement-breakpoint
-CREATE INDEX "idx_status" ON "stages" USING btree ("status");--> statement-breakpoint
-CREATE INDEX "idx_created_at" ON "stages" USING btree ("created_at");--> statement-breakpoint
-CREATE INDEX "idx_ranking_id" ON "stages" USING btree ("ranking_id");--> statement-breakpoint
-CREATE INDEX "idx_username" ON "users" USING btree ("username");
+CREATE INDEX IF NOT EXISTS "idx_total_points" ON "general_ranking" USING btree ("total_points");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_name" ON "general_ranking" USING btree ("name");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_general_position" ON "general_ranking" USING btree ("position");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_gr_ranking_id" ON "general_ranking" USING btree ("ranking_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_is_default" ON "rankings" USING btree ("is_default");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_stage_id" ON "stage_ranking" USING btree ("stage_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_stage_position" ON "stage_ranking" USING btree ("position");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_status" ON "stages" USING btree ("status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_created_at" ON "stages" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_ranking_id" ON "stages" USING btree ("ranking_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_username" ON "users" USING btree ("username");

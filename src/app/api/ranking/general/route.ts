@@ -10,14 +10,14 @@ export async function GET(request: Request) {
     const rankingIdStr = searchParams.get("rankingId");
     const rankingId = rankingIdStr ? parseInt(rankingIdStr) : null;
 
-    const query = db.select().from(generalRanking);
+    let query = db.select().from(generalRanking).$dynamic();
 
     // Exclude soft-deleted entries
-    query.where(isNull(generalRanking.deletedAt));
+    query = query.where(isNull(generalRanking.deletedAt));
 
     if (rankingId) {
       // Include entries for this specific ranking
-      query.where(
+      query = query.where(
         or(
           eq(generalRanking.rankingId, rankingId),
           and(

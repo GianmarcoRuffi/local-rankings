@@ -11,6 +11,7 @@ import {
   index,
   integer,
 } from "drizzle-orm/pg-core";
+import { isNull } from "drizzle-orm";
 
 export const statusEnum = pgEnum("status", ["pending", "active", "merged"]);
 
@@ -34,7 +35,7 @@ export const rankings = pgTable(
   "rankings",
   {
     id: serial().primaryKey(),
-    name: varchar({ length: 200 }).notNull().unique(),
+    name: varchar({ length: 200 }).notNull(),
     description: text(),
     isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -47,6 +48,7 @@ export const rankings = pgTable(
   (table) => [
     index("idx_is_default").on(table.isDefault),
     index("idx_rankings_deleted_at").on(table.deletedAt),
+    index("idx_rankings_active_name").on(table.name).where(isNull(table.deletedAt)),
   ]
 );
 

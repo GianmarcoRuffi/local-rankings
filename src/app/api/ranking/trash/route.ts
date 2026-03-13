@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { rankings, generalRanking, stages } from "@/lib/db/schema";
-import { eq, not, isNull, desc } from "drizzle-orm";
+import { rankings, generalRanking, stages, stageRanking } from "@/lib/db/schema";
+import { eq, not, isNull, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 const restoreRankingSchema = z.object({
@@ -93,22 +93,24 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Ranking not found in trash" }, { status: 404 });
       }
 
-      // Restore the ranking
-      await db
-        .update(rankings)
-        .set({ deletedAt: null })
-        .where(eq(rankings.id, rankingId));
+      await db.transaction(async (tx) => {
+        // Restore the ranking
+        await tx
+          .update(rankings)
+          .set({ deletedAt: null })
+          .where(eq(rankings.id, rankingId));
 
-      // Also restore any associated data
-      await db
-        .update(generalRanking)
-        .set({ deletedAt: null })
-        .where(eq(generalRanking.rankingId, rankingId));
+        // Also restore any associated data
+        await tx
+          .update(generalRanking)
+          .set({ deletedAt: null })
+          .where(eq(generalRanking.rankingId, rankingId));
 
-      await db
-        .update(stages)
-        .set({ deletedAt: null })
-        .where(eq(stages.rankingId, rankingId));
+        await tx
+          .update(stages)
+          .set({ deletedAt: null })
+          .where(eq(stages.rankingId, rankingId));
+      });
 
       return NextResponse.json({ success: true, message: "Classifica ripristinata" });
     }
@@ -138,19 +140,37 @@ export async function POST(request: Request) {
 
       const { rankingId } = parsed.data;
 
-      // First delete all related data permanently
-      await db
-        .delete(generalRanking)
-        .where(eq(generalRanking.rankingId, rankingId));
+      await db.transaction(async (tx) => {
+        // Find stages linked to this ranking to delete their players
+        const rankingStages = await tx
+          .select({ id: stages.id })
+          .from(stages)
+          .where(eq(stages.rankingId, rankingId));
+        
+        const stageIds = rankingStages.map(s => s.id);
 
-      await db
-        .delete(stages)
-        .where(eq(stages.rankingId, rankingId));
+        if (stageIds.length > 0) {
+          // Delete players from all stages of this ranking
+          await tx
+            .delete(stageRanking)
+            .where(inArray(stageRanking.stageId, stageIds));
+        }
 
-      // Then delete the ranking
-      await db
-        .delete(rankings)
-        .where(eq(rankings.id, rankingId));
+        // Delete all related stages permanently
+        await tx
+          .delete(stages)
+          .where(eq(stages.rankingId, rankingId));
+
+        // Delete all related general ranking data permanently
+        await tx
+          .delete(generalRanking)
+          .where(eq(generalRanking.rankingId, rankingId));
+
+        // Then delete the ranking
+        await tx
+          .delete(rankings)
+          .where(eq(rankings.id, rankingId));
+      });
 
       return NextResponse.json({ success: true, message: "Classifica eliminata definitivamente" });
     }

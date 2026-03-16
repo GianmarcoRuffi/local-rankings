@@ -1,17 +1,28 @@
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
-import * as schema from "./db/schema";
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import * as schema from './db/schema';
 
-const pool = mysql.createPool({
-  host: process.env.DATABASE_HOST || "localhost",
-  port: Number(process.env.DATABASE_PORT) || 3306,
-  user: process.env.DATABASE_USER || "root",
-  password: process.env.DATABASE_PASSWORD || "",
-  database: process.env.DATABASE_NAME || "local_rankings",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+const connectionString = process.env.DATABASE_URL;
 
-export const db = drizzle(pool, { schema, mode: "default" });
+if (!connectionString) {
+  throw new Error('DATABASE_URL is not set');
+}
+
+const globalForDb = globalThis as unknown as {
+  pool?: Pool;
+};
+
+const pool =
+  globalForDb.pool ??
+  new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+  });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForDb.pool = pool;
+}
+
+export const db = drizzle(pool, { schema });
+
 export default pool;

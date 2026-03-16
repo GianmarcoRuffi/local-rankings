@@ -1,26 +1,37 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import { db } from "@/lib/db";
+import { generalRanking } from "@/lib/db/schema";
+import { eq, or, and, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function GET(request: Request) {
   try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM general_ranking"
-    );
+    const { searchParams } = new URL(request.url);
+    const rankingIdStr = searchParams.get("rankingId");
+    const rankingId = rankingIdStr ? parseInt(rankingIdStr) : null;
+
+    const query = db.select().from(generalRanking);
+
+    if (rankingId) {
+      // Include entries for this specific ranking
+      query.where(
+        or(
+          eq(generalRanking.rankingId, rankingId),
+          and(
+            isNull(generalRanking.rankingId),
+            sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
+          )
+        )
+      );
+    }
+
+    const rows = await query;
 
     // Ordina usando il comparatore personalizzato
     const sorted = sortRanking(
       rows.map((row) => ({
         ...row,
-        total_points: row.total_points ?? 0,
+        total_points: row.totalPoints ?? 0,
         t1: row.t1 ?? 0,
       }))
     );

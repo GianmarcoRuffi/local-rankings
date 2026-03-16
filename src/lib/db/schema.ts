@@ -1,19 +1,23 @@
 import {
-  mysqlTable,
-  int,
+  pgTable,
+  serial,
   varchar,
+  text,
   timestamp,
   date,
-  mysqlEnum,
+  pgEnum,
   decimal,
-  text,
+  boolean,
   index,
-} from "drizzle-orm/mysql-core";
+  integer,
+} from "drizzle-orm/pg-core";
 
-export const users = mysqlTable(
+export const statusEnum = pgEnum("status", ["pending", "active", "merged"]);
+
+export const users = pgTable(
   "users",
   {
-    id: int().autoincrement().primaryKey(),
+    id: serial().primaryKey(),
     username: varchar({ length: 100 }).notNull().unique(),
     passwordHash: varchar("password_hash", { length: 255 }).notNull(),
     displayName: varchar("display_name", { length: 150 }).notNull(),
@@ -26,16 +30,31 @@ export const users = mysqlTable(
   (table) => [index("idx_username").on(table.username)]
 );
 
-export const stages = mysqlTable(
+export const rankings = pgTable(
+  "rankings",
+  {
+    id: serial().primaryKey(),
+    name: varchar({ length: 200 }).notNull().unique(),
+    description: text(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("idx_is_default").on(table.isDefault)]
+);
+
+export const stages = pgTable(
   "stages",
   {
-    id: int().autoincrement().primaryKey(),
+    id: serial().primaryKey(),
+    rankingId: integer("ranking_id"),
     name: varchar({ length: 200 }).notNull(),
     date: date(),
     pdfFilename: varchar("pdf_filename", { length: 255 }),
-    status: mysqlEnum("status", ["pending", "active", "merged"])
-      .notNull()
-      .default("pending"),
+    status: statusEnum("status").notNull().default("pending"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -45,40 +64,39 @@ export const stages = mysqlTable(
   (table) => [
     index("idx_status").on(table.status),
     index("idx_created_at").on(table.createdAt),
+    index("idx_ranking_id").on(table.rankingId),
   ]
 );
 
-export const stageRanking = mysqlTable(
+export const stageRanking = pgTable(
   "stage_ranking",
   {
-    id: int().autoincrement().primaryKey(),
-    stageId: int("stage_id").notNull(),
-    position: int().notNull(),
+    id: serial().primaryKey(),
+    stageId: integer("stage_id").notNull(),
+    position: integer().notNull(),
     name: varchar({ length: 200 }).notNull(),
     score: decimal({ precision: 10, scale: 3 }),
-    pointsAwarded: int("points_awarded").notNull().default(0),
-    t1: int().default(0),
-    presenze: int().notNull().default(1),
-    rawData: text("raw_data"),
+    pointsAwarded: integer("points_awarded").notNull().default(0),
+    t1: integer().default(0),
+    presenze: integer().notNull().default(1),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     index("idx_stage_id").on(table.stageId),
-    index("idx_position").on(table.position),
+    index("idx_stage_position").on(table.position),
   ]
 );
 
-export const generalRanking = mysqlTable(
+export const generalRanking = pgTable(
   "general_ranking",
   {
-    id: int().autoincrement().primaryKey(),
-    position: int().default(0),
-    name: varchar({ length: 200 }).notNull().unique(),
-    totalPoints: int("total_points").notNull().default(0),
-    t1: int().default(0),
-    presenze: int().notNull().default(0),
-    stagesPlayed: int("stages_played").notNull().default(0),
-    bestResults: text("best_results"),
+    id: serial().primaryKey(),
+    rankingId: integer("ranking_id"),
+    position: integer().default(0),
+    name: varchar({ length: 200 }).notNull(),
+    totalPoints: integer("total_points").notNull().default(0),
+    t1: integer().default(0),
+    presenze: integer().notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -88,6 +106,7 @@ export const generalRanking = mysqlTable(
   (table) => [
     index("idx_total_points").on(table.totalPoints),
     index("idx_name").on(table.name),
-    index("idx_position").on(table.position),
+    index("idx_general_position").on(table.position),
+    index("idx_gr_ranking_id").on(table.rankingId),
   ]
 );

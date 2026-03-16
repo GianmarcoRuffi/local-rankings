@@ -7,7 +7,7 @@ import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { sortRanking } from "@/lib/ranking-logic";
 
-const mergeSchema = z.object({
+const revertMergeSchema = z.object({
   stageId: z.union([z.number().int().positive(), z.string()]),
 });
 
@@ -34,18 +34,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const body = await request.json();
+  const parsedBody = revertMergeSchema.safeParse(body);
+  const stageId = parsedBody.success ? toPositiveInt(parsedBody.data.stageId) : null;
+
+  if (!stageId) {
+    return NextResponse.json({ error: "Valid stageId is required" }, { status: 400 });
+  }
+
   try {
-    const body = await request.json();
-    const parsedBody = mergeSchema.safeParse(body);
-    const stageId = parsedBody.success ? toPositiveInt(parsedBody.data.stageId) : null;
-
-    if (!stageId) {
-      return NextResponse.json(
-        { error: "Valid stageId is required" },
-        { status: 400 }
-      );
-    }
-
     const stageRows = await db
       .select()
       .from(stages)
@@ -58,11 +55,8 @@ export async function POST(request: Request) {
 
     const stage = stageRows[0];
 
-    if (stage.status === "merged") {
-      return NextResponse.json(
-        { error: "This stage has already been merged" },
-        { status: 409 }
-      );
+    if (stage.status !== "merged") {
+      return NextResponse.json({ error: "This stage has not been merged" }, { status: 409 });
     }
 
     // Get the ranking_id from the stage
@@ -105,33 +99,33 @@ export async function POST(request: Request) {
 
         if (existing.length > 0) {
           const current = existing[0];
-          await tx
-            .update(generalRanking)
-            .set({
-              totalPoints: current.totalPoints + (player.pointsAwarded || 0),
-              t1: (current.t1 || 0) + (player.t1 || 0),
-              presenze: (current.presenze || 0) + (player.presenze || 1),
-              updatedAt: new Date(),
-            })
-            .where(eq(generalRanking.id, current.id));
-        } else {
-          await tx.insert(generalRanking).values({
-            name: player.name,
-            rankingId: rankingId,
-            totalPoints: player.pointsAwarded || 0,
-            t1: player.t1 || 0,
-            presenze: player.presenze || 1,
-            updatedAt: new Date(),
-          });
+          const newPoints = current.totalPoints - (player.pointsAwarded || 0);
+          const newT1 = (current.t1 || 0) - (player.t1 || 0);
+          const newPresenze = (current.presenze || 0) - (player.presenze || 1);
+
+          if (newPoints <= 0 && newT1 === 0 && newPresenze <= 0) {
+            await tx
+              .delete(generalRanking)
+              .where(eq(generalRanking.id, current.id));
+          } else {
+            await tx
+              .update(generalRanking)
+              .set({
+                totalPoints: Math.max(0, newPoints),
+                t1: newT1,
+                presenze: Math.max(0, newPresenze),
+                updatedAt: new Date(),
+              })
+              .where(eq(generalRanking.id, current.id));
+          }
         }
       }
 
       await tx
         .update(stages)
-        .set({ status: "merged", updatedAt: new Date() })
+        .set({ status: "active", updatedAt: new Date() })
         .where(eq(stages.id, stageId));
 
-      // Riordina la classifica generale per questo ranking
       const allPlayers = await tx
         .select({ id: generalRanking.id, totalPoints: generalRanking.totalPoints, t1: generalRanking.t1 })
         .from(generalRanking)
@@ -145,33 +139,30 @@ export async function POST(request: Request) {
           )
         );
 
-      const sorted = sortRanking(
-        allPlayers.map((p) => ({
-          id: p.id,
-          total_points: p.totalPoints,
-          t1: p.t1 || 0,
-        }))
-      );
+      if (allPlayers.length > 0) {
+        const sorted = sortRanking(
+          allPlayers.map((p) => ({
+            id: p.id,
+            total_points: p.totalPoints,
+            t1: p.t1 || 0,
+          }))
+        );
 
-      // Aggiorna le posizioni
-      for (let i = 0; i < sorted.length; i++) {
-        await tx
-          .update(generalRanking)
-          .set({ position: i + 1 })
-          .where(eq(generalRanking.id, sorted[i].id));
+        for (let i = 0; i < sorted.length; i++) {
+          await tx
+            .update(generalRanking)
+            .set({ position: i + 1 })
+            .where(eq(generalRanking.id, sorted[i].id));
+        }
       }
     });
 
     return NextResponse.json({
       success: true,
-      message: `Stage "${stage.name}" merged successfully`,
-      playersUpdated: stagePlayers.length,
+      message: `Merge della tappa "${stage.name}" annullato`,
     });
   } catch (error) {
-    console.error("Error merging stage:", error);
-    return NextResponse.json(
-      { error: "Failed to merge stage" },
-      { status: 500 }
-    );
+    console.error("Error reverting merge:", error);
+    return NextResponse.json({ error: "Failed to revert merge" }, { status: 500 });
   }
 }

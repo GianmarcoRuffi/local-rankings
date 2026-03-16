@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   ChevronUp,
   ChevronDown,
@@ -10,6 +12,11 @@ import {
   Flag,
   CheckCircle,
   Clock,
+  Trash2,
+  Pencil,
+  Check,
+  X,
+  Undo2,
 } from "lucide-react";
 import {
   Table,
@@ -22,16 +29,33 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Stage, StageRankingPlayer, SortConfig } from "@/types/ranking";
 import { toast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useRanking } from "@/hooks/useRanking";
 
-function SortIcon({ column, sortConfig }: { column: string; sortConfig: SortConfig }) {
+function SortIcon({
+  column,
+  sortConfig,
+}: {
+  column: string;
+  sortConfig: SortConfig;
+}) {
   if (sortConfig.key !== column)
     return <ChevronsUpDown className="h-4 w-4 ml-1 opacity-50" />;
-  return sortConfig.direction === "asc"
-    ? <ChevronUp className="h-4 w-4 ml-1" />
-    : <ChevronDown className="h-4 w-4 ml-1" />;
+  return sortConfig.direction === "asc" ? (
+    <ChevronUp className="h-4 w-4 ml-1" />
+  ) : (
+    <ChevronDown className="h-4 w-4 ml-1" />
+  );
 }
 
 function StatusBadge({ status }: { status: Stage["status"] }) {
@@ -39,14 +63,14 @@ function StatusBadge({ status }: { status: Stage["status"] }) {
     return (
       <Badge variant="success" className="gap-1">
         <CheckCircle className="h-3 w-3" />
-        Unita
+        Inserita
       </Badge>
     );
   if (status === "active")
     return (
       <Badge variant="warning" className="gap-1">
         <Clock className="h-3 w-3" />
-        Attiva
+        Da inserire
       </Badge>
     );
   return (
@@ -61,42 +85,95 @@ function T1Badge({ t1 }: { t1: number }) {
   const value = t1 || 0;
   if (value > 0) {
     return (
-      <Badge variant="outline" className="font-bold text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400">
+      <Badge
+        variant="outline"
+        className="font-bold text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400 px-1 text-[10px] sm:text-xs"
+      >
         +{value}
       </Badge>
     );
   }
   if (value < 0) {
     return (
-      <Badge variant="outline" className="font-bold text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400">
+      <Badge
+        variant="outline"
+        className="font-bold text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-700 dark:text-red-400 px-1 text-[10px] sm:text-xs"
+      >
         {value}
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="font-bold text-muted-foreground">
+    <Badge
+      variant="outline"
+      className="font-bold text-muted-foreground px-1 text-[10px] sm:text-xs"
+    >
       0
     </Badge>
   );
 }
 
+interface EditState {
+  name: string;
+  points_awarded: string; // kept snake-case since API expects it
+  t1: string;
+  presenze: string;
+}
+
+interface StageEditState {
+  name: string;
+  date: string;
+}
+
 export function StageRankingView() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAuthenticated = !!session;
+  const { selectedRanking } = useRanking();
   const [stages, setStages] = useState<Stage[]>([]);
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
-  const [players, setPlayers] = useState<StageRankingPlayer[]>([]);
+  const [players, setPlayers] = useState<StageRankingPlayer[]>([]); // shape updated in types
   const [loadingStages, setLoadingStages] = useState(true);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [reverting, setReverting] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "position",
     direction: "asc",
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [stageToDelete, setStageToDelete] = useState<Stage | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editState, setEditState] = useState<EditState>({
+    name: "",
+    points_awarded: "",
+    t1: "",
+    presenze: "",
+  }); // unchanged
+  const [saving, setSaving] = useState(false);
+  const [deletePlayerDialogOpen, setDeletePlayerDialogOpen] = useState(false);
+  const [playerToDelete, setPlayerToDelete] =
+    useState<StageRankingPlayer | null>(null);
+  const [deletingPlayer, setDeletingPlayer] = useState(false);
+  const [editingStage, setEditingStage] = useState(false);
+  const [stageEditState, setStageEditState] = useState<StageEditState>({
+    name: "",
+    date: "",
+  });
+  const [savingStage, setSavingStage] = useState(false);
+  const [confirmEditDialogOpen, setConfirmEditDialogOpen] = useState(false);
+  const [playerToConfirmEdit, setPlayerToConfirmEdit] =
+    useState<StageRankingPlayer | null>(null);
 
   const fetchStages = useCallback(async () => {
+    if (!selectedRanking) return;
+
     setLoadingStages(true);
     try {
-      const res = await fetch("/api/ranking/stages");
+      const res = await fetch(
+        `/api/ranking/stages?rankingId=${selectedRanking.id}`,
+      );
       if (res.ok) {
         const data = await res.json();
         setStages(data);
@@ -107,7 +184,7 @@ export function StageRankingView() {
     } finally {
       setLoadingStages(false);
     }
-  }, [selectedStage]);
+  }, [selectedRanking, selectedStage]);
 
   const fetchPlayers = useCallback(async (stageId: number) => {
     setLoadingPlayers(true);
@@ -124,7 +201,8 @@ export function StageRankingView() {
 
   useEffect(() => {
     fetchStages();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRanking]);
 
   useEffect(() => {
     if (selectedStage) {
@@ -161,6 +239,203 @@ export function StageRankingView() {
       }
     } finally {
       setMerging(false);
+    }
+  };
+
+  const handleRevertMerge = async () => {
+    if (!selectedStage) return;
+    setReverting(true);
+    try {
+      const res = await fetch("/api/ranking/merge/revert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stageId: selectedStage.id }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast({
+          title: "Merge annullato",
+          description: data.message,
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
+        await fetchStages();
+        router.refresh();
+      } else {
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setReverting(false);
+    }
+  };
+
+  const handleDeleteStage = async () => {
+    if (!stageToDelete) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/ranking/stages/${stageToDelete.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          title: "Tappa eliminata",
+          description: `La tappa "${stageToDelete.name}" è stata eliminata.`,
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
+        setDeleteDialogOpen(false);
+        if (selectedStage?.id === stageToDelete.id) {
+          setSelectedStage(null);
+          setPlayers([]);
+        }
+        setStageToDelete(null);
+        await fetchStages();
+      } else {
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeletePlayer = async () => {
+    if (!playerToDelete || !selectedStage) return;
+    setDeletingPlayer(true);
+    try {
+      const res = await fetch(
+        `/api/ranking/stages/${selectedStage.id}/players/${playerToDelete.id}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          title: "Giocatore eliminato",
+          description: `"${playerToDelete.name}" è stato rimosso dalla tappa.`,
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
+        setDeletePlayerDialogOpen(false);
+        setPlayerToDelete(null);
+        await fetchPlayers(selectedStage.id);
+      } else {
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setDeletingPlayer(false);
+    }
+  };
+
+  const startEdit = (player: StageRankingPlayer) => {
+    setEditingId(player.id);
+    setEditState({
+      name: player.name,
+      // convert from camelCase coming from the API
+      points_awarded: String(player.pointsAwarded),
+      t1: String(player.t1 ?? 0),
+      presenze: String(player.presenze),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const saveEdit = async (player: StageRankingPlayer) => {
+    if (!selectedStage) return;
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/ranking/stages/${selectedStage.id}/players/${player.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: editState.name,
+            points_awarded: parseInt(editState.points_awarded) || 0,
+            t1: parseInt(editState.t1) || 0,
+            presenze: parseInt(editState.presenze) || 1,
+          }),
+        },
+      );
+      if (res.ok) {
+        toast({
+          title: "Salvato",
+          description: "Giocatore aggiornato.",
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
+        setEditingId(null);
+        await fetchPlayers(selectedStage.id);
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startStageEdit = (stage: Stage) => {
+    setEditingStage(true);
+    setStageEditState({
+      name: stage.name,
+      date: stage.date ?? "",
+    });
+  };
+
+  const cancelStageEdit = () => {
+    setEditingStage(false);
+  };
+
+  const saveStageEdit = async () => {
+    if (!currentSelectedStage) return;
+    setSavingStage(true);
+    try {
+      const res = await fetch(
+        `/api/ranking/stages/${currentSelectedStage.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: stageEditState.name,
+            date: stageEditState.date || null,
+            ranking_id: selectedRanking?.id,
+          }),
+        },
+      );
+      if (res.ok) {
+        toast({
+          title: "Tappa aggiornata",
+          description: "Nome e data della tappa sono stati salvati.",
+          variant: "success" as Parameters<typeof toast>[0]["variant"],
+        });
+        setEditingStage(false);
+        await fetchStages();
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Errore",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setSavingStage(false);
     }
   };
 
@@ -201,13 +476,26 @@ export function StageRankingView() {
     </TableHead>
   );
 
+  const currentSelectedStage =
+    stages.find((s) => s.id === selectedStage?.id) ?? selectedStage;
+  const isActive = currentSelectedStage?.status === "active";
+
+  if (!selectedRanking) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Flag className="h-10 w-10 mx-auto mb-2 opacity-30" />
+        <p>Seleziona una classifica per visualizzare le tappe</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Flag className="h-5 w-5 text-primary" />
-            Tappe disponibili
+            {stages.length} Tappe - {selectedRanking.name}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -219,53 +507,138 @@ export function StageRankingView() {
           ) : stages.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Flag className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p>Nessuna tappa disponibile</p>
-              <p className="text-sm">Carica un PDF dalla sezione &quot;Carica PDF&quot;</p>
+              <p>Nessuna tappa per questa classifica</p>
+              <p className="text-sm">
+                Carica un PDF dalla sezione &quot;Aggiungi tappe&quot;
+              </p>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {stages.map((stage) => (
-                <Button
-                  key={stage.id}
-                  variant={selectedStage?.id === stage.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedStage(stage)}
-                  className="gap-2"
-                >
-                  {stage.name}
-                  <StatusBadge status={stage.status} />
-                </Button>
+                <div key={stage.id} className="flex items-center gap-1">
+                  <Button
+                    variant={
+                      selectedStage?.id === stage.id ? "default" : "outline"
+                    }
+                    size="sm"
+                    onClick={() => setSelectedStage(stage)}
+                    className="gap-2"
+                  >
+                    {stage.name}
+                    <StatusBadge status={stage.status} />
+                  </Button>
+                  {isAuthenticated && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        setStageToDelete(stage);
+                        setDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {selectedStage && (
+      {currentSelectedStage && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                {selectedStage.name}
-                <StatusBadge status={selectedStage.status} />
-                <Badge variant="secondary">{players.length} giocatori</Badge>
-              </CardTitle>
-              {selectedStage.date && (
+            <div className="flex-1">
+              {isAuthenticated && editingStage ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={stageEditState.name}
+                    onChange={(e) =>
+                      setStageEditState((s) => ({ ...s, name: e.target.value }))
+                    }
+                    className="h-8 w-48"
+                    placeholder="Nome tappa"
+                  />
+                  <Input
+                    type="date"
+                    value={stageEditState.date}
+                    onChange={(e) =>
+                      setStageEditState((s) => ({ ...s, date: e.target.value }))
+                    }
+                    className="h-8 w-40"
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-green-600"
+                    onClick={saveStageEdit}
+                    disabled={savingStage}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-red-600"
+                    onClick={cancelStageEdit}
+                    disabled={savingStage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <CardTitle className="flex items-center gap-2 flex-wrap">
+                  {currentSelectedStage.name}
+                  <StatusBadge status={currentSelectedStage.status} />
+                  <Badge variant="secondary">{players.length} giocatori</Badge>
+                  {isAuthenticated && isActive && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => startStageEdit(currentSelectedStage)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </CardTitle>
+              )}
+              {!editingStage && currentSelectedStage.date && (
                 <p className="text-sm text-muted-foreground mt-1">
                   Data:{" "}
-                  {new Date(selectedStage.date).toLocaleDateString("it-IT")}
+                  {new Date(currentSelectedStage.date).toLocaleDateString(
+                    "it-IT",
+                  )}
                 </p>
               )}
             </div>
-            {selectedStage.status !== "merged" && (
-              <Button
-                onClick={handleMerge}
-                disabled={merging || players.length === 0}
-                className="gap-2"
-              >
-                <Merge className="h-4 w-4" />
-                {merging ? "Unione in corso..." : "Unisci alla classifica generale"}
-              </Button>
+            {isAuthenticated && (
+              <div className="flex gap-2">
+                {currentSelectedStage.status === "merged" ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleRevertMerge}
+                    disabled={reverting}
+                    className="gap-2"
+                  >
+                    <Undo2 className="h-4 w-4" />
+                    {reverting ? "Annullamento..." : "Annulla inserimento"}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleMerge}
+                    disabled={merging || players.length === 0}
+                    className="gap-2"
+                  >
+                    <Merge className="h-4 w-4" />
+                    {merging
+                      ? "Unione in corso..."
+                      : "Inserisci nella classifica"}
+                  </Button>
+                )}
+              </div>
             )}
           </CardHeader>
           <CardContent>
@@ -284,12 +657,23 @@ export function StageRankingView() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableHead column="position">Pos.</SortableHead>
+                    <SortableHead column="position">
+                      <span className="hidden xs:inline">Pos.</span>
+                      <span className="xs:hidden">#</span>
+                    </SortableHead>
                     <SortableHead column="name">Giocatore</SortableHead>
-                    <SortableHead column="score">Punteggio</SortableHead>
-                    <SortableHead column="points_awarded">Punti Classifica</SortableHead>
+                    <SortableHead column="pointsAwarded">
+                      <span className="hidden sm:inline">Punti Classifica</span>
+                      <span className="sm:hidden">Punti</span>
+                    </SortableHead>
                     <SortableHead column="t1">T1</SortableHead>
-                    <SortableHead column="presenze">Presenze</SortableHead>
+                    <SortableHead column="presenze">
+                      <span className="hidden xs:inline">Presenze</span>
+                      <span className="xs:hidden">Pres.</span>
+                    </SortableHead>
+                    {isAuthenticated && isActive && (
+                      <TableHead className="w-16 sm:w-24">Azioni</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -298,25 +682,133 @@ export function StageRankingView() {
                       <TableCell className="font-medium">
                         {player.position}°
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {player.name}
-                      </TableCell>
-                      <TableCell>
-                        {player.score !== null && player.score !== undefined
-                          ? player.score
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-bold">
-                          +{player.points_awarded} pt
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <T1Badge t1={player.t1} />
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{player.presenze}</Badge>
-                      </TableCell>
+                      {isAuthenticated &&
+                      isActive &&
+                      editingId === player.id ? (
+                        <>
+                          <TableCell>
+                            <Input
+                              value={editState.name}
+                              onChange={(e) =>
+                                setEditState((s) => ({
+                                  ...s,
+                                  name: e.target.value,
+                                }))
+                              }
+                              className="h-8 w-40"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={editState.points_awarded}
+                              onChange={(e) =>
+                                setEditState((s) => ({
+                                  ...s,
+                                  points_awarded: e.target.value,
+                                }))
+                              }
+                              className="h-8 w-20"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={editState.t1}
+                              onChange={(e) =>
+                                setEditState((s) => ({
+                                  ...s,
+                                  t1: e.target.value,
+                                }))
+                              }
+                              className="h-8 w-20"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={editState.presenze}
+                              onChange={(e) =>
+                                setEditState((s) => ({
+                                  ...s,
+                                  presenze: e.target.value,
+                                }))
+                              }
+                              className="h-8 w-20"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-green-600"
+                                onClick={() => {
+                                  setPlayerToConfirmEdit(player);
+                                  setConfirmEditDialogOpen(true);
+                                }}
+                                disabled={saving}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-red-600"
+                                onClick={cancelEdit}
+                                disabled={saving}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="font-medium text-xs sm:text-sm py-3">
+                            {player.name}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="font-bold text-[10px] sm:text-xs px-1 sm:px-2"
+                            >
+                              +{player.pointsAwarded} pt
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <T1Badge t1={player.t1} />
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{player.presenze}</Badge>
+                          </TableCell>
+                          {isAuthenticated && isActive && (
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => startEdit(player)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    setPlayerToDelete(player);
+                                    setDeletePlayerDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -325,6 +817,142 @@ export function StageRankingView() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Eliminare la tappa?
+            </DialogTitle>
+            <DialogDescription>
+              Stai per eliminare la tappa{" "}
+              <strong>&quot;{stageToDelete?.name}&quot;</strong>. Questa
+              operazione è <strong>irreversibile</strong>: tutti i dati dei
+              giocatori di questa tappa verranno cancellati definitivamente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteStage}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminazione...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Sì, elimina
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deletePlayerDialogOpen}
+        onOpenChange={setDeletePlayerDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Eliminare il giocatore?
+            </DialogTitle>
+            <DialogDescription>
+              Stai per eliminare{" "}
+              <strong>&quot;{playerToDelete?.name}&quot;</strong> dalla tappa.
+              Le posizioni verranno ricalcolate automaticamente. Questa
+              operazione è <strong>irreversibile</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeletePlayerDialogOpen(false)}
+              disabled={deletingPlayer}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeletePlayer}
+              disabled={deletingPlayer}
+            >
+              {deletingPlayer ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminazione...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Sì, elimina
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmEditDialogOpen}
+        onOpenChange={setConfirmEditDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conferma modifica</DialogTitle>
+            <DialogDescription>
+              Stai per modificare i record del giocatore{" "}
+              <strong>&quot;{playerToConfirmEdit?.name}&quot;</strong>. Vuoi
+              procedere?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmEditDialogOpen(false)}
+              disabled={saving}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                if (playerToConfirmEdit) {
+                  saveEdit(playerToConfirmEdit);
+                  setConfirmEditDialogOpen(false);
+                }
+              }}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Sì, modifica
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

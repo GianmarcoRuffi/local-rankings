@@ -1,20 +1,30 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
-import { Trophy, BarChart3, Upload, LogOut, User } from "lucide-react";
+import { signIn, signOut } from "next-auth/react";
+import {
+  Trophy,
+  BarChart3,
+  Upload,
+  LogOut,
+  User,
+  LogIn,
+  KeyRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { RankingSelector } from "@/components/ranking-selector";
 
 interface NavbarProps {
   user: {
     name?: string | null;
     email?: string | null;
-  };
+  } | null;
 }
 
-const navItems = [
+const publicNavItems = [
   {
     href: "/dashboard",
     label: "Classifica Generale",
@@ -22,29 +32,155 @@ const navItems = [
   },
   {
     href: "/dashboard/stage",
-    label: "Tappa",
+    label: "Visualizza tappe",
     icon: Trophy,
   },
+];
+
+const privateNavItems = [
   {
     href: "/dashboard/upload",
-    label: "Carica PDF",
+    label: "Aggiungi tappe",
     icon: Upload,
   },
 ];
 
 export function Navbar({ user }: NavbarProps) {
   const pathname = usePathname();
+  const [isScrolled, setIsScrolled] = useState(false);
+  const navItems = user
+    ? [...publicNavItems, ...privateNavItems]
+    : publicNavItems;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <nav className="border-b bg-card shadow-sm">
+    <nav
+      className={cn(
+        "sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 transition-all duration-300",
+        isScrolled ? "shadow-md" : "shadow-sm"
+      )}
+    >
       <div className="container mx-auto px-4 max-w-7xl">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg">Local Rankings</span>
-            </Link>
-            <div className="hidden md:flex items-center gap-1">
+        {/* Main Header Row: Logo, Ranking Selector, User Actions */}
+        <div 
+          className={cn(
+            "flex items-center justify-between gap-2 transition-all duration-300",
+            isScrolled ? "h-14" : "h-16"
+          )}
+        >
+          {/* Logo Section */}
+          <Link href="/dashboard" className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <Trophy
+              className={cn(
+                "text-primary shrink-0 transition-all duration-300",
+                isScrolled ? "h-5 w-5" : "h-6 w-6"
+              )}
+            />
+            <span
+              className={cn(
+                "font-bold hidden md:inline shrink-0 transition-all duration-300",
+                isScrolled ? "text-base" : "text-lg"
+              )}
+            >
+              Rankings
+            </span>
+          </Link>
+
+          {/* Nav Items (Desktop only) */}
+          <div className="hidden lg:flex items-center gap-1 mx-4">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(item.href);
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button
+                    variant={isActive ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "gap-2 transition-all duration-300",
+                      isScrolled ? "h-8 px-2 text-xs" : "h-9 px-3"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Button>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Right Section: Selector + User Actions */}
+          <div className={cn(
+            "flex items-center gap-1 sm:gap-2 shrink-0",
+            !user && "flex-1 justify-end"
+          )}>
+            <RankingSelector className={cn(!user && "flex-1")} />
+            
+            <div className="flex items-center gap-1 border-l border-border ml-1 pl-1 sm:pl-2">
+              {user ? (
+                <>
+                  <div className="hidden lg:flex items-center gap-2 mr-2 text-sm text-muted-foreground max-w-[120px]">
+                    <User className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{user.name || user.email}</span>
+                  </div>
+                  <Link href="/dashboard/change-password">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300"
+                      title="Password"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      <span className="hidden sm:inline ml-2">Password</span>
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => signOut({ callbackUrl: "/dashboard" })}
+                    className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300 font-semibold"
+                    title="Esci"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="hidden sm:inline ml-2">Esci</span>
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="default"
+                  size="icon"
+                  onClick={() => signIn(undefined, { callbackUrl: "/dashboard" })}
+                  className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300"
+                  title="Accedi"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-2">Accedi</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Tabs Row (Mobile/Tablet only) */}
+        <div className="lg:hidden border-t py-2">
+          <div className="flex items-center gap-4">
+            {user && (
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground shrink-0 border-r pr-3">
+                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="max-w-[70px] truncate">{user.name?.split(' ')[0] || 'Utente'}</span>
+              </div>
+            )}
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide flex-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive =
@@ -52,13 +188,16 @@ export function Navbar({ user }: NavbarProps) {
                     ? pathname === "/dashboard"
                     : pathname.startsWith(item.href);
                 return (
-                  <Link key={item.href} href={item.href}>
+                  <Link key={item.href} href={item.href} className="shrink-0">
                     <Button
-                      variant={isActive ? "default" : "ghost"}
+                      variant={isActive ? "secondary" : "ghost"}
                       size="sm"
-                      className="gap-2"
+                      className={cn(
+                        "gap-2 whitespace-nowrap h-8 px-3 text-xs",
+                        isActive && "bg-secondary text-secondary-foreground"
+                      )}
                     >
-                      <Icon className="h-4 w-4" />
+                      <Icon className="h-3.5 w-3.5" />
                       {item.label}
                     </Button>
                   </Link>
@@ -66,42 +205,6 @@ export function Navbar({ user }: NavbarProps) {
               })}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-              <User className="h-4 w-4" />
-              <span>{user.name || user.email}</span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Esci</span>
-            </Button>
-          </div>
-        </div>
-        <div className="md:hidden flex gap-1 pb-2 overflow-x-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
-            return (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={isActive ? "default" : "ghost"}
-                  size="sm"
-                  className={cn("gap-2 whitespace-nowrap")}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Button>
-              </Link>
-            );
-          })}
         </div>
       </div>
     </nav>

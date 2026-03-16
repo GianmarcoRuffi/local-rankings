@@ -6,7 +6,7 @@ export default function StagePage() {
       <div>
         <h1 className="text-3xl font-bold">Classifica Tappa</h1>
         <p className="text-muted-foreground mt-1">
-          Visualizza e gestisci le classifiche temporanee delle singole tappe
+          Visualizza e gestisci le classifiche delle singole tappe
         </p>
       </div>
       <StageRankingView />

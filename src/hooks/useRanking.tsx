@@ -81,8 +81,6 @@ export function RankingProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Rimuovi il secondo useEffect ridondante che faceva confusione
-
   return (
     <RankingContext.Provider
       value={{

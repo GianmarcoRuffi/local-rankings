@@ -49,7 +49,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    console.log('[PDF Upload] Starting upload...');
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const stageName = formData.get('stageName') as string | null;
@@ -73,12 +72,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 413 });
     }
 
-    console.log('[PDF Upload] File received:', file.name);
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     // Parse PDF per estrarre il testo
-    console.log('[PDF Upload] Parsing PDF...');
     const fullText = await new Promise<string>((resolve, reject) => {
       const pdfParser = new PDFParser();
 
@@ -122,12 +119,8 @@ export async function POST(request: Request) {
       pdfParser.parseBuffer(buffer);
     });
 
-    console.log('[PDF Upload] PDF parsed, text length:', fullText.length);
-
     // Parse il testo per estrarre i giocatori
-    console.log('[PDF Upload] Extracting players...');
     const players = parsePdfText(fullText);
-    console.log('[PDF Upload] Players extracted:', players.length);
 
     if (players.length === 0) {
       return NextResponse.json(
@@ -154,8 +147,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Stage name is required' }, { status: 400 });
     }
 
-    console.log('[PDF Upload] Creating stage:', name, 'for ranking:', effectiveRankingId);
-    
     const result = await db.transaction(async (tx) => {
       const [insertedStage] = await tx
         .insert(stages)
@@ -169,9 +160,7 @@ export async function POST(request: Request) {
         .returning();
 
       const stageId = insertedStage.id;
-      console.log('[PDF Upload] Stage created with ID:', stageId);
 
-      console.log('[PDF Upload] Inserting players...');
       const playersToInsert = players.map((player) => ({
         stageId,
         position: player.position,
@@ -187,8 +176,6 @@ export async function POST(request: Request) {
       return { stageId };
     });
 
-    console.log('[PDF Upload] All players inserted successfully');
-
     return NextResponse.json({
       stageId: result.stageId,
       stageName: name,
@@ -202,10 +189,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('[PDF Upload] Error processing PDF:', error);
-    console.error(
-      '[PDF Upload] Error stack:',
-      error instanceof Error ? error.stack : 'No stack',
-    );
     return NextResponse.json(
       {
         error: "Errore durante l'elaborazione del PDF",

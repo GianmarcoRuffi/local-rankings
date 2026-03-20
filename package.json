@@ -15,8 +15,7 @@
     "db:drop": "drizzle-kit drop",
     "db:seed": "tsx scripts/seed.ts",
     "db:mock": "tsx scripts/mock-data.ts",
-    "db:create-user": "tsx scripts/create-user.ts",
-    "db:create-db-user": "tsx scripts/create-db-user.ts"
+    "db:create-user": "tsx scripts/create-user.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -43,7 +42,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.5.0",
-    "vercel": "^50.28.0",
+    "vercel": "^50.34.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

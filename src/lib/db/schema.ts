@@ -27,7 +27,7 @@ export const users = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("idx_username").on(table.username)]
+  (table) => [index("idx_username").on(table.username)],
 );
 
 export const rankings = pgTable(
@@ -43,7 +43,7 @@ export const rankings = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("idx_is_default").on(table.isDefault)]
+  (table) => [index("idx_is_default").on(table.isDefault)],
 );
 
 export const stages = pgTable(
@@ -65,7 +65,7 @@ export const stages = pgTable(
     index("idx_status").on(table.status),
     index("idx_created_at").on(table.createdAt),
     index("idx_ranking_id").on(table.rankingId),
-  ]
+  ],
 );
 
 export const stageRanking = pgTable(
@@ -84,7 +84,7 @@ export const stageRanking = pgTable(
   (table) => [
     index("idx_stage_id").on(table.stageId),
     index("idx_stage_position").on(table.position),
-  ]
+  ],
 );
 
 export const generalRanking = pgTable(
@@ -108,5 +108,20 @@ export const generalRanking = pgTable(
     index("idx_name").on(table.name),
     index("idx_general_position").on(table.position),
     index("idx_gr_ranking_id").on(table.rankingId),
-  ]
+  ],
+);
+
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    id: serial().primaryKey(),
+    username: varchar({ length: 100 }).notNull(),
+    failedCount: integer("failed_count").notNull().default(0),
+    lockedUntil: timestamp("locked_until"),
+    lastAttempt: timestamp("last_attempt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_username_attempts").on(table.username),
+    index("idx_locked_until").on(table.lockedUntil),
+  ],
 );

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Script from "next/script";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Trophy } from "lucide-react";
 import {
@@ -32,7 +31,11 @@ export default function LoginPage() {
   const [captchaToken, setCaptchaToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const turnstileSiteKey =
+    typeof window === "undefined"
+      ? process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+      : (window as any).__NEXT_PUBLIC_TURNSTILE_SITE_KEY__ ||
+        process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const isTurnstileConfigured = Boolean(turnstileSiteKey);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,20 +56,30 @@ export default function LoginPage() {
     }
 
     try {
-      const result = await signIn("credentials", {
-        username,
-        password,
-        captchaToken,
-        redirect: false,
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username,
+          password,
+          captchaToken,
+        }),
       });
 
-      if (result?.error) {
-        setError("Username o password non corretti");
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Errore durante il login");
         setCaptchaToken("");
         window.turnstile?.reset();
       } else {
-        router.push("/dashboard");
+        // Forza reload completo per assicurare che il cookie venga letto
+        window.location.href = "/dashboard";
       }
+    } catch {
+      setError("Errore di connessione");
     } finally {
       setLoading(false);
     }
@@ -140,7 +153,11 @@ export default function LoginPage() {
                   {error}
                 </div>
               )}
-              <Button type="submit" className="w-full" disabled={loading || !isTurnstileConfigured}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !isTurnstileConfigured}
+              >
                 {loading ? "Accesso in corso..." : "Accedi"}
               </Button>
             </form>

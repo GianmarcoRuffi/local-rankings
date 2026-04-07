@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { stages, rankings, stageRanking } from "@/lib/db/schema";
 import { eq, or, and, isNull, desc, sql } from "drizzle-orm";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
+import { toPositiveInt } from "@/lib/utils";
 
 const stagePlayerSchema = z.object({
   position: z.number().int().positive(),
@@ -18,28 +19,14 @@ const stagePlayerSchema = z.object({
 const createStageSchema = z.object({
   name: z.string().trim().min(1),
   date: z.string().optional().nullable(),
-  rankingId: z.union([z.number().int().positive(), z.string()]).optional().nullable(),
+  rankingId: z
+    .union([z.number().int().positive(), z.string()])
+    .optional()
+    .nullable(),
   players: z.array(stagePlayerSchema).optional(),
 });
 
 type StagePlayerInput = z.infer<typeof stagePlayerSchema>;
-
-function toPositiveInt(value: unknown): number | null {
-  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
-    return value;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
 
 export async function GET(request: Request) {
   try {
@@ -60,27 +47,27 @@ export async function GET(request: Request) {
           eq(stages.rankingId, rankingId),
           and(
             isNull(stages.rankingId),
-            sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
-          )
-        )
+            sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+          ),
+        ),
       );
     }
 
     const rows = await query.orderBy(desc(stages.createdAt));
     return NextResponse.json(rows);
   } catch (error) {
-    console.error("Error fetching stages:", error);
+    logger.error("Failed to fetch stages", { error });
     return NextResponse.json(
       { error: "Failed to fetch stages" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   try {
@@ -88,12 +75,18 @@ export async function POST(request: Request) {
     const parsedBody = createStageSchema.safeParse(body);
 
     if (!parsedBody.success) {
-      return NextResponse.json({ error: "Invalid stage payload" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid stage payload" },
+        { status: 400 },
+      );
     }
 
     const { name, date, players, rankingId } = parsedBody.data;
 
-    let effectiveRankingId = rankingId !== undefined && rankingId !== null ? toPositiveInt(rankingId) : null;
+    let effectiveRankingId =
+      rankingId !== undefined && rankingId !== null
+        ? toPositiveInt(rankingId)
+        : null;
     if (rankingId !== undefined && rankingId !== null && !effectiveRankingId) {
       return NextResponse.json({ error: "Invalid rankingId" }, { status: 400 });
     }
@@ -105,42 +98,54 @@ export async function POST(request: Request) {
         .from(rankings)
         .where(eq(rankings.isDefault, true))
         .limit(1);
-      
+
       if (defaultRanking.length > 0) {
         effectiveRankingId = defaultRanking[0].id;
       }
     }
 
-    const result = await db.transaction(async (tx) => {
-      const [insertedStage] = await tx
-        .insert(stages)
-        .values({
-          name: name.trim(),
-          date: date ? new Date(date).toISOString().split('T')[0] : null,
-          rankingId: effectiveRankingId,
-          status: "active",
-        })
-        .returning();
+    let result;
+    try {
+      result = await db.transaction(async (tx) => {
+        const [insertedStage] = await tx
+          .insert(stages)
+          .values({
+            name: name.trim(),
+            date: date ? new Date(date).toISOString().split("T")[0] : null,
+            rankingId: effectiveRankingId,
+            status: "active",
+          })
+          .returning();
 
-      const stageId = insertedStage.id;
+        const stageId = insertedStage.id;
 
-      // If players are provided, insert them
-      if (players && Array.isArray(players) && players.length > 0) {
-        const playersToInsert = players.map((player: StagePlayerInput) => ({
-          stageId,
-          position: player.position,
-          name: player.name,
-          score: player.score?.toString() ?? null,
-          pointsAwarded: player.points_awarded,
-          t1: player.t1 ?? 0,
-          presenze: player.presenze ?? 1,
-        }));
+        // If players are provided, insert them
+        if (players && Array.isArray(players) && players.length > 0) {
+          const playersToInsert = players.map((player: StagePlayerInput) => ({
+            stageId,
+            position: player.position,
+            name: player.name,
+            score: player.score?.toString() ?? null,
+            pointsAwarded: player.points_awarded,
+            t1: player.t1 ?? 0,
+            presenze: player.presenze ?? 1,
+          }));
 
-        await tx.insert(stageRanking).values(playersToInsert);
-      }
+          await tx.insert(stageRanking).values(playersToInsert);
+        }
 
-      return { stageId, effectiveRankingId };
-    });
+        return { stageId, effectiveRankingId };
+      });
+    } catch (transactionError) {
+      logger.error("Transaction failed during stage creation", {
+        stageName: name,
+        error: transactionError,
+      });
+      return NextResponse.json(
+        { error: "Failed to create stage due to transaction error" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({
       id: result.stageId,
@@ -150,10 +155,10 @@ export async function POST(request: Request) {
       playersCount: players?.length ?? 0,
     });
   } catch (error) {
-    console.error("Error creating stage:", error);
+    logger.error("Failed to create stage", { error });
     return NextResponse.json(
       { error: "Failed to create stage" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

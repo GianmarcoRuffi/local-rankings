@@ -1,31 +1,23 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { generalRanking } from "@/lib/db/schema";
 import { eq, or, and, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
-
-function parsePositiveInt(value: string): number | null {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
+import { toPositiveInt } from "@/lib/utils";
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const { id } = await params;
-  const playerId = parsePositiveInt(id);
+  const playerId = toPositiveInt(id);
 
   if (!playerId) {
     return NextResponse.json({ error: "Invalid player id" }, { status: 400 });
@@ -40,7 +32,9 @@ export async function PATCH(
 
   try {
     // Get the ranking_id from the player if not provided
-    let effectiveRankingId = ranking_id ? Number.parseInt(ranking_id, 10) : null;
+    let effectiveRankingId = ranking_id
+      ? Number.parseInt(ranking_id, 10)
+      : null;
     if (!effectiveRankingId) {
       const playerRow = await db
         .select({ rankingId: generalRanking.rankingId })
@@ -65,18 +59,22 @@ export async function PATCH(
 
     // Fetch all players in the same ranking
     const query = db
-      .select({ id: generalRanking.id, totalPoints: generalRanking.totalPoints, t1: generalRanking.t1 })
+      .select({
+        id: generalRanking.id,
+        totalPoints: generalRanking.totalPoints,
+        t1: generalRanking.t1,
+      })
       .from(generalRanking);
-    
+
     if (effectiveRankingId) {
       query.where(
         or(
           eq(generalRanking.rankingId, effectiveRankingId),
           and(
             isNull(generalRanking.rankingId),
-            sql`${effectiveRankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
-          )
-        )
+            sql`${effectiveRankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+          ),
+        ),
       );
     }
 
@@ -87,7 +85,7 @@ export async function PATCH(
         id: p.id,
         total_points: p.totalPoints,
         t1: p.t1 || 0,
-      }))
+      })),
     );
 
     await db.transaction(async (tx) => {
@@ -101,7 +99,10 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating general ranking player:", error);
-    return NextResponse.json({ error: "Failed to update player" }, { status: 500 });
+    logger.error("Error updating general ranking player:", { error });
+    return NextResponse.json(
+      { error: "Failed to update player" },
+      { status: 500 },
+    );
   }
 }

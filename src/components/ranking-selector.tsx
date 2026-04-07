@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useSession";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Plus, Trash2, Pencil, Trophy, List, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,10 @@ interface RankingSelectorProps {
   className?: string;
 }
 
-export function RankingSelector({ onRankingChange, className }: RankingSelectorProps) {
+export function RankingSelector({
+  onRankingChange,
+  className,
+}: RankingSelectorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -227,10 +230,12 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
           value={selectedRanking ? String(selectedRanking.id) : ""}
           onValueChange={handleSelectRanking}
         >
-          <SelectTrigger className={cn(
-            "w-[110px] xs:w-[140px] sm:w-[220px] cursor-pointer",
-            className?.includes("flex-1") && "w-full"
-          )}>
+          <SelectTrigger
+            className={cn(
+              "w-[110px] xs:w-[140px] sm:w-[220px] cursor-pointer",
+              className?.includes("flex-1") && "w-full",
+            )}
+          >
             <List className="h-4 w-4 mr-2 shrink-0" />
             <span className="truncate text-xs sm:text-sm">
               {selectedRanking?.name || "Seleziona classifica"}
@@ -316,7 +321,7 @@ export function RankingSelector({ onRankingChange, className }: RankingSelectorP
               >
                 <Plus className="h-4 w-4" />
               </Button>
-              
+
               {selectedRanking && (
                 <div className="flex items-center gap-0.5">
                   <Button

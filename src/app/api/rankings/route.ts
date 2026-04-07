@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { rankings } from "@/lib/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 const createRankingSchema = z.object({
   name: z.string().trim().min(1),
@@ -20,18 +20,21 @@ export async function GET() {
       .orderBy(desc(rankings.isDefault), asc(rankings.name));
     return NextResponse.json(rows);
   } catch (error) {
-    console.error("Error fetching rankings:", error);
+    logger.error("Failed to fetch rankings", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
       { error: "Failed to fetch rankings" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   try {
@@ -39,10 +42,7 @@ export async function POST(request: Request) {
     const parsed = createRankingSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid payload" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
     const { name, description, is_default } = parsed.data;
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     console.error("Error creating ranking:", error);
     return NextResponse.json(
       { error: "Failed to create ranking" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

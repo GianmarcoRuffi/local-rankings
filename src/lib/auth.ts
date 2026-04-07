@@ -4,11 +4,14 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { users, loginAttempts } from "@/lib/db/schema";
-import { eq, and, gt, lt } from "drizzle-orm";
-
-const MAX_FAILED_ATTEMPTS = 15;
-const LOCK_WINDOW_MS = 15 * 60 * 1000;
-const CLEANUP_WINDOW_MS = 24 * 60 * 60 * 1000;
+import { eq, and, lt } from "drizzle-orm";
+import { env } from "@/lib/env";
+import {
+  MAX_FAILED_LOGIN_ATTEMPTS,
+  LOGIN_LOCK_WINDOW_MS,
+  LOGIN_ATTEMPTS_CLEANUP_MS,
+} from "@/lib/constants";
+import { logger } from "@/lib/logger";
 
 async function isTemporarilyLocked(username: string): Promise<boolean> {
   try {
@@ -62,12 +65,12 @@ async function registerFailedAttempt(username: string): Promise<void> {
     const record = records[0];
     const nextCount = record.failedCount + 1;
 
-    if (nextCount >= MAX_FAILED_ATTEMPTS) {
+    if (nextCount >= MAX_FAILED_LOGIN_ATTEMPTS) {
       await db
         .update(loginAttempts)
         .set({
           failedCount: 0,
-          lockedUntil: new Date(now.getTime() + LOCK_WINDOW_MS),
+          lockedUntil: new Date(now.getTime() + LOGIN_LOCK_WINDOW_MS),
           lastAttempt: now,
         })
         .where(eq(loginAttempts.username, username));
@@ -82,7 +85,7 @@ async function registerFailedAttempt(username: string): Promise<void> {
       })
       .where(eq(loginAttempts.username, username));
   } catch (error) {
-    console.error("Error registering failed attempt:", error);
+    logger.error("Failed to register login attempt", { username, error });
   }
 }
 
@@ -90,13 +93,13 @@ async function clearAttempts(username: string): Promise<void> {
   try {
     await db.delete(loginAttempts).where(eq(loginAttempts.username, username));
   } catch (error) {
-    console.error("Error clearing attempts:", error);
+    logger.error("Failed to clear login attempts", { username, error });
   }
 }
 
 async function cleanupOldAttempts(): Promise<void> {
   try {
-    const cutoff = new Date(Date.now() - CLEANUP_WINDOW_MS);
+    const cutoff = new Date(Date.now() - LOGIN_ATTEMPTS_CLEANUP_MS);
     await db
       .delete(loginAttempts)
       .where(
@@ -106,7 +109,7 @@ async function cleanupOldAttempts(): Promise<void> {
         ),
       );
   } catch (error) {
-    console.error("Error cleaning up old attempts:", error);
+    logger.error("Failed to cleanup old login attempts", { error });
   }
 }
 
@@ -120,10 +123,7 @@ async function verifyTurnstileToken(
   token: string,
   ip?: string | null,
 ): Promise<boolean> {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) {
-    return false;
-  }
+  const secret = env.TURNSTILE_SECRET_KEY;
 
   const body = new URLSearchParams();
   body.set("secret", secret);

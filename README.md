@@ -15,7 +15,7 @@ Sistema gestionale per l'organizzazione e il calcolo delle classifiche di tornei
 
 ### Prerequisiti
 - Node.js 18.x o superiore
-- PostgreSQL (istanza locale o cloud come Aiven/Neon)
+- PostgreSQL (istanza locale o cloud come Neon, Vercel Postgres, Supabase)
 
 ### Installazione
 1. Clonare il repository:
@@ -64,7 +64,7 @@ L'applicazione sarà raggiungibile di default all'indirizzo `http://localhost:30
 
 ### Problemi di connessione al database
 - Verificare che la stringa `DATABASE_URL` sia corretta e accessibile.
-- Se si utilizza Aiven o provider con SSL, assicurarsi che i parametri di connessione in `src/lib/db.ts` siano configurati correttamente (il progetto gestisce già i certificati self-signed in ambiente dev).
+- Il progetto supporta automaticamente connessioni SSL in produzione e gestisce correttamente i certificati self-signed in ambiente di sviluppo.
 
 ### Errori nel parsing dei PDF
 - Assicurarsi che il PDF caricato segua il formato standard previsto dal parser.

@@ -125,3 +125,19 @@ export const loginAttempts = pgTable(
     index("idx_locked_until").on(table.lockedUntil),
   ],
 );
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: serial().primaryKey(),
+    userId: integer("user_id").notNull(),
+    token: varchar({ length: 255 }).notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_session_token").on(table.token),
+    index("idx_session_user_id").on(table.userId),
+    index("idx_session_expires_at").on(table.expiresAt),
+  ],
+);

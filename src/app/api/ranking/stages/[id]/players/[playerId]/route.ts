@@ -1,17 +1,17 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { stages, stageRanking } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string; playerId: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; playerId: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const { id: stageIdParam, playerId } = await params;
@@ -19,7 +19,10 @@ export async function PATCH(
   const id = parseInt(playerId, 10);
 
   if (Number.isNaN(stageId) || Number.isNaN(id)) {
-    return NextResponse.json({ error: "Invalid stage/player id" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid stage/player id" },
+      { status: 400 },
+    );
   }
 
   const body = await request.json();
@@ -39,7 +42,7 @@ export async function PATCH(
     if (stageRows[0].status !== "active") {
       return NextResponse.json(
         { error: "Impossibile modificare giocatori di una tappa non attiva" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -55,23 +58,29 @@ export async function PATCH(
       .returning({ id: stageRanking.id });
 
     if (updatedRows.length === 0) {
-      return NextResponse.json({ error: "Player not found in stage" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Player not found in stage" },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating stage ranking player:", error);
-    return NextResponse.json({ error: "Failed to update player" }, { status: 500 });
+    logger.error("Error updating stage ranking player:", { error });
+    return NextResponse.json(
+      { error: "Failed to update player" },
+      { status: 500 },
+    );
   }
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string; playerId: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; playerId: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const { id: stageIdStr, playerId: playerIdStr } = await params;
@@ -92,14 +101,16 @@ export async function DELETE(
     if (stageRows[0].status !== "active") {
       return NextResponse.json(
         { error: "Impossibile eliminare giocatori da una tappa non attiva" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     await db.transaction(async (tx) => {
       await tx
         .delete(stageRanking)
-        .where(and(eq(stageRanking.id, playerId), eq(stageRanking.stageId, stageId)));
+        .where(
+          and(eq(stageRanking.id, playerId), eq(stageRanking.stageId, stageId)),
+        );
 
       const remaining = await tx
         .select({ id: stageRanking.id })
@@ -117,7 +128,10 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting stage player:", error);
-    return NextResponse.json({ error: "Failed to delete player" }, { status: 500 });
+    logger.error("Error deleting stage player:", { error });
+    return NextResponse.json(
+      { error: "Failed to delete player" },
+      { status: 500 },
+    );
   }
 }

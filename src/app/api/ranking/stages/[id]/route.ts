@@ -1,30 +1,22 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { stages, stageRanking } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-function parsePositiveInt(value: string): number | null {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
+import { toPositiveInt } from "@/lib/utils";
 
 export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const { id } = await params;
-  const stageId = parsePositiveInt(id);
+  const stageId = toPositiveInt(id);
 
   if (!stageId) {
     return NextResponse.json({ error: "Invalid stage id" }, { status: 400 });
@@ -51,7 +43,7 @@ export async function PUT(
     if (stageRows[0].status !== "active") {
       return NextResponse.json(
         { error: "Impossibile modificare una tappa non attiva" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -59,7 +51,7 @@ export async function PUT(
       .update(stages)
       .set({
         name,
-        date: date ? new Date(date).toISOString().split('T')[0] : null,
+        date: date ? new Date(date).toISOString().split("T")[0] : null,
         rankingId: ranking_id ? parseInt(ranking_id) : null,
         updatedAt: new Date(),
       })
@@ -67,17 +59,20 @@ export async function PUT(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating stage:", error);
-    return NextResponse.json({ error: "Failed to update stage" }, { status: 500 });
+    logger.error("Error updating stage:", { error });
+    return NextResponse.json(
+      { error: "Failed to update stage" },
+      { status: 500 },
+    );
   }
 }
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const stageId = parsePositiveInt(id);
+  const stageId = toPositiveInt(id);
 
   if (!stageId) {
     return NextResponse.json({ error: "Invalid stage id" }, { status: 400 });
@@ -91,25 +86,25 @@ export async function GET(
       .orderBy(stageRanking.position);
     return NextResponse.json(players);
   } catch (error) {
-    console.error("Error fetching stage ranking:", error);
+    logger.error("Error fetching stage ranking:", { error });
     return NextResponse.json(
       { error: "Failed to fetch stage ranking" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const { id } = await params;
-  const stageId = parsePositiveInt(id);
+  const stageId = toPositiveInt(id);
 
   if (!stageId) {
     return NextResponse.json({ error: "Invalid stage id" }, { status: 400 });
@@ -133,7 +128,10 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: "Tappa eliminata" });
   } catch (error) {
-    console.error("Error deleting stage:", error);
-    return NextResponse.json({ error: "Failed to delete stage" }, { status: 500 });
+    logger.error("Error deleting stage:", { error });
+    return NextResponse.json(
+      { error: "Failed to delete stage" },
+      { status: 500 },
+    );
   }
 }

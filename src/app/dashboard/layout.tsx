@@ -1,17 +1,15 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { Navbar } from "@/components/navbar";
+import { NavbarWrapper } from "@/components/navbar-wrapper";
 
-export default async function DashboardLayout({
+export const dynamic = "force-dynamic";
+
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
-
   return (
     <div className="min-h-screen bg-background">
-      <Navbar user={session?.user ?? null} />
+      <NavbarWrapper />
       <main className="container mx-auto px-4 py-8 max-w-7xl">{children}</main>
     </div>
   );

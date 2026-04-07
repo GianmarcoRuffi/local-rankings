@@ -1,15 +1,16 @@
-import 'dotenv/config';
-import bcrypt from 'bcryptjs';
-import { db } from '../src/lib/db';
-import { users } from '../src/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import "dotenv/config";
+import bcrypt from "bcryptjs";
+import { db } from "../src/lib/db";
+import { users } from "../src/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { BCRYPT_ROUNDS } from "../src/lib/constants";
 
 async function createUser() {
-  const username = process.argv[2] || 'admin';
-  const password = process.argv[3] || 'admin123';
-  const displayName = process.argv[4] || 'Amministratore';
+  const username = process.argv[2] || "admin";
+  const password = process.argv[3] || "admin123";
+  const displayName = process.argv[4] || "Amministratore";
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
   const existingUser = await db
     .select()
@@ -36,6 +37,6 @@ async function createUser() {
 }
 
 createUser().catch((error) => {
-  console.error('Failed to create user:', error);
+  console.error("Failed to create user:", error);
   process.exit(1);
 });

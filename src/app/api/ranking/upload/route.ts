@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
-import { stages, rankings, stageRanking } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { parsePdfText, capitalizeName } from '@/lib/ranking-logic';
-import PDFParser from 'pdf2json';
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/require-auth";
+import { db } from "@/lib/db";
+import { stages, rankings, stageRanking } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { parsePdfText, capitalizeName } from "@/lib/ranking-logic";
+import { MAX_UPLOAD_SIZE_BYTES } from "@/lib/constants";
+import { logger } from "@/lib/logger";
+import { toPositiveInt } from "@/lib/utils";
+import PDFParser from "pdf2json";
 
 type PdfErrorData = Error | { parserError: Error };
 
@@ -23,53 +25,40 @@ interface PdfData {
   Pages: PdfPage[];
 }
 
-const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
-
-function toPositiveInt(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
-    return value;
-  }
-
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
-
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    const stageName = formData.get('stageName') as string | null;
-    const stageDate = formData.get('stageDate') as string | null;
-    const rankingIdStr = formData.get('rankingId') as string | null;
+    const file = formData.get("file") as File | null;
+    const stageName = formData.get("stageName") as string | null;
+    const stageDate = formData.get("stageDate") as string | null;
+    const rankingIdStr = formData.get("rankingId") as string | null;
     const rankingId = rankingIdStr ? toPositiveInt(rankingIdStr) : null;
 
     if (rankingIdStr && !rankingId) {
-      return NextResponse.json({ error: 'Invalid rankingId' }, { status: 400 });
+      return NextResponse.json({ error: "Invalid rankingId" }, { status: 400 });
     }
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      return NextResponse.json({ error: 'Only PDF files are supported' }, { status: 400 });
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      return NextResponse.json(
+        { error: "Only PDF files are supported" },
+        { status: 400 },
+      );
     }
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 413 });
+      return NextResponse.json(
+        { error: "File too large (max 10MB)" },
+        { status: 413 },
+      );
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -79,7 +68,7 @@ export async function POST(request: Request) {
     const fullText = await new Promise<string>((resolve, reject) => {
       const pdfParser = new PDFParser();
 
-      pdfParser.on('pdfParser_dataError', (errData: PdfErrorData) => {
+      pdfParser.on("pdfParser_dataError", (errData: PdfErrorData) => {
         if (errData instanceof Error) {
           reject(errData);
           return;
@@ -88,8 +77,8 @@ export async function POST(request: Request) {
         reject(errData.parserError);
       });
 
-      pdfParser.on('pdfParser_dataReady', (pdfData: PdfData) => {
-        let text = '';
+      pdfParser.on("pdfParser_dataReady", (pdfData: PdfData) => {
+        let text = "";
 
         for (const page of pdfData.Pages) {
           const texts = page.Texts || [];
@@ -105,12 +94,12 @@ export async function POST(request: Request) {
             const decoded = decodeURIComponent(textItem.R[0].T);
 
             if (lastY !== -1 && Math.abs(textItem.y - lastY) > 0.5) {
-              text += '\n';
+              text += "\n";
             }
-            text += decoded + ' ';
+            text += decoded + " ";
             lastY = textItem.y;
           }
-          text += '\n';
+          text += "\n";
         }
 
         resolve(text);
@@ -124,7 +113,7 @@ export async function POST(request: Request) {
 
     if (players.length === 0) {
       return NextResponse.json(
-        { error: 'Nessun giocatore trovato nel PDF. Verifica il formato.' },
+        { error: "Nessun giocatore trovato nel PDF. Verifica il formato." },
         { status: 422 },
       );
     }
@@ -142,9 +131,12 @@ export async function POST(request: Request) {
       }
     }
 
-    const name = (stageName?.trim() || file.name.replace('.pdf', '')).trim();
+    const name = (stageName?.trim() || file.name.replace(".pdf", "")).trim();
     if (!name) {
-      return NextResponse.json({ error: 'Stage name is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Stage name is required" },
+        { status: 400 },
+      );
     }
 
     const result = await db.transaction(async (tx) => {
@@ -152,10 +144,12 @@ export async function POST(request: Request) {
         .insert(stages)
         .values({
           name,
-          date: stageDate ? new Date(stageDate).toISOString().split('T')[0] : null,
+          date: stageDate
+            ? new Date(stageDate).toISOString().split("T")[0]
+            : null,
           pdfFilename: file.name,
           rankingId: effectiveRankingId,
-          status: 'active',
+          status: "active",
         })
         .returning();
 
@@ -172,7 +166,7 @@ export async function POST(request: Request) {
       }));
 
       await tx.insert(stageRanking).values(playersToInsert);
-      
+
       return { stageId };
     });
 
@@ -188,7 +182,9 @@ export async function POST(request: Request) {
       })),
     });
   } catch (error) {
-    console.error('[PDF Upload] Error processing PDF:', error);
+    logger.error("Failed to process PDF upload", {
+      error,
+    });
     return NextResponse.json(
       {
         error: "Errore durante l'elaborazione del PDF",

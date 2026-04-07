@@ -13,6 +13,16 @@ export interface ParsedTablePlayer {
   t1: number;
 }
 
+export function sanitizeName(name: string): string {
+  if (!name) return "";
+
+  return name
+    .replace(/[<>"'`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .substring(0, 200);
+}
+
 const POINTS_TABLE: Record<number, number> = {
   1: 25,
   2: 18,
@@ -61,7 +71,8 @@ export function parsePdfText(text: string): ParsedPlayer[] {
     const match = line.match(dataRegex);
     if (match) {
       const position = parseInt(match[1], 10);
-      const name = match[2].trim();
+      const rawName = match[2].trim();
+      const name = sanitizeName(rawName);
       const vp = parseInt(match[3], 10);
       const t1Str = match[4];
       const t1 = parseInt(t1Str.replace("+", ""), 10);
@@ -92,7 +103,8 @@ export function parsePdfTableData(tableRows: string[][]): ParsedTablePlayer[] {
     const position = parseInt(col0, 10);
     if (isNaN(position) || position < 1) continue;
 
-    const name = col1;
+    const rawName = col1;
+    const name = sanitizeName(rawName);
     if (!name || name.length === 0) continue;
 
     const scoreStr = col2.replace(",", ".");

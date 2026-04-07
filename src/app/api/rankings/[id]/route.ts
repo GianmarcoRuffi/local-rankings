@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { rankings, generalRanking, stages } from "@/lib/db/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { z } from "zod";
+import { toPositiveInt } from "@/lib/utils";
 
 const updateRankingSchema = z.object({
   name: z.string().trim().min(1),
@@ -12,21 +13,12 @@ const updateRankingSchema = z.object({
   is_default: z.boolean().optional(),
 });
 
-function parsePositiveInt(value: string): number | null {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
-
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const rankingId = parsePositiveInt(id);
+  const rankingId = toPositiveInt(id);
 
   if (!rankingId) {
     return NextResponse.json({ error: "Invalid ranking id" }, { status: 400 });
@@ -45,25 +37,25 @@ export async function GET(
 
     return NextResponse.json(rows[0]);
   } catch (error) {
-    console.error("Error fetching ranking:", error);
+    logger.error("Error fetching ranking:", { error });
     return NextResponse.json(
       { error: "Failed to fetch ranking" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const { id } = await params;
-  const rankingId = parsePositiveInt(id);
+  const rankingId = toPositiveInt(id);
 
   if (!rankingId) {
     return NextResponse.json({ error: "Invalid ranking id" }, { status: 400 });
@@ -111,25 +103,25 @@ export async function PUT(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating ranking:", error);
+    logger.error("Error updating ranking:", { error });
     return NextResponse.json(
       { error: "Failed to update ranking" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const { id } = await params;
-  const rankingId = parsePositiveInt(id);
+  const rankingId = toPositiveInt(id);
 
   if (!rankingId) {
     return NextResponse.json({ error: "Invalid ranking id" }, { status: 400 });
@@ -149,7 +141,7 @@ export async function DELETE(
     if (existing[0].isDefault) {
       return NextResponse.json(
         { error: "Cannot delete the default ranking" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -174,10 +166,10 @@ export async function DELETE(
       message: "Ranking deleted successfully",
     });
   } catch (error) {
-    console.error("Error deleting ranking:", error);
+    logger.error("Error deleting ranking:", { error });
     return NextResponse.json(
       { error: "Failed to delete ranking" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

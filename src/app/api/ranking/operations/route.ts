@@ -1,21 +1,11 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { stageRanking, generalRanking } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { sortRanking, capitalizeName } from "@/lib/ranking-logic";
-
-const allowedOperations = new Set([
-  "sortByName",
-  "sortByPoints",
-  "capitalizeNames",
-  "recalculatePositions",
-  "multiplyScores",
-]);
-
-const allowedTargets = new Set(["stage", "general"]);
+import { logger } from "@/lib/logger";
 
 const operationSchema = z.object({
   operation: z.enum([
@@ -30,17 +20,17 @@ const operationSchema = z.object({
 
 /**
  * API per operazioni di gestione tabella
- * 
+ *
  * Operazioni supportate:
  * - sortByName: Ordina alfabeticamente per nome
  * - sortByPoints: Ordina per punti totali (decrescente) e T1
  * - capitalizeNames: Capitalizza la prima lettera di ogni nome
  * - recalculatePositions: Ricalcola le posizioni in classifica
  */
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   try {
@@ -50,35 +40,23 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid operation payload" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const { operation, target } = parsed.data;
-    if (!allowedOperations.has(operation)) {
-      return NextResponse.json(
-        { error: "Invalid operation" },
-        { status: 400 }
-      );
-    }
 
     const normalizedTarget = target ?? "general";
-    if (!allowedTargets.has(normalizedTarget)) {
-      return NextResponse.json(
-        { error: "Invalid target" },
-        { status: 400 }
-      );
-    }
 
     const table = normalizedTarget === "stage" ? stageRanking : generalRanking;
 
     switch (operation) {
       case "sortByName": {
         const rows = await db.select().from(table);
-        
+
         // Ordina alfabeticamente per nome
-        const sorted = [...rows].sort((a, b) => 
-          a.name.localeCompare(b.name, "it")
+        const sorted = [...rows].sort((a, b) =>
+          a.name.localeCompare(b.name, "it"),
         );
 
         await db.transaction(async (tx) => {
@@ -103,9 +81,11 @@ export async function POST(request: Request) {
         const sorted = sortRanking(
           rows.map((row) => ({
             id: row.id,
-            total_points: Number(("totalPoints" in row ? row.totalPoints : row.pointsAwarded) ?? 0),
+            total_points: Number(
+              ("totalPoints" in row ? row.totalPoints : row.pointsAwarded) ?? 0,
+            ),
             t1: row.t1 ?? 0,
-          }))
+          })),
         );
 
         await db.transaction(async (tx) => {
@@ -125,7 +105,9 @@ export async function POST(request: Request) {
       }
 
       case "capitalizeNames": {
-        const rows = await db.select({ id: table.id, name: table.name }).from(table);
+        const rows = await db
+          .select({ id: table.id, name: table.name })
+          .from(table);
 
         let updated = 0;
         await db.transaction(async (tx) => {
@@ -154,9 +136,11 @@ export async function POST(request: Request) {
         const sorted = sortRanking(
           rows.map((row) => ({
             id: row.id,
-            total_points: Number(("totalPoints" in row ? row.totalPoints : row.pointsAwarded) ?? 0),
+            total_points: Number(
+              ("totalPoints" in row ? row.totalPoints : row.pointsAwarded) ?? 0,
+            ),
             t1: row.t1 ?? 0,
-          }))
+          })),
         );
 
         await db.transaction(async (tx) => {
@@ -180,7 +164,7 @@ export async function POST(request: Request) {
         if (normalizedTarget !== "stage") {
           return NextResponse.json(
             { error: "multiplyScores is only available for stage_ranking" },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
@@ -198,14 +182,11 @@ export async function POST(request: Request) {
       default:
         return NextResponse.json(
           { error: `Unknown operation: ${operation}` },
-          { status: 400 }
+          { status: 400 },
         );
     }
   } catch (error) {
-    console.error("Error in operations API:", error);
-    return NextResponse.json(
-      { error: "Operation failed" },
-      { status: 500 }
-    );
+    logger.error("Operation failed", { error });
+    return NextResponse.json({ error: "Operation failed" }, { status: 500 });
   }
 }

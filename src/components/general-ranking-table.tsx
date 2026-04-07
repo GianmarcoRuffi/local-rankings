@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useSession";
 import {
   ChevronUp,
   ChevronDown,
@@ -188,10 +188,11 @@ export function GeneralRankingTable() {
 
     setLoading(true);
     try {
-      const url = `/api/ranking/general?rankingId=${selectedRanking.id}`;
+      const url = `/api/ranking/general?rankingId=${selectedRanking.id}&limit=1000`;
       const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json();
+        const response = await res.json();
+        const data = response.data || response;
         setPlayers(data);
       }
     } finally {
@@ -338,10 +339,14 @@ export function GeneralRankingTable() {
     ];
 
     const csv = rows
-      .map((row) => row.map((value) => `"${value.replaceAll("\"", "\"\"")}"`).join(";"))
+      .map((row) =>
+        row.map((value) => `"${value.replaceAll('"', '""')}"`).join(";"),
+      )
       .join("\n");
 
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     const filename = selectedRanking
@@ -500,7 +505,8 @@ export function GeneralRankingTable() {
             variant="secondary"
             className="text-[10px] sm:text-xs px-2 py-0.5 whitespace-nowrap ml-1"
           >
-            {players.length} <span className="hidden xs:inline ml-1">giocatori</span>
+            {players.length}{" "}
+            <span className="hidden xs:inline ml-1">giocatori</span>
           </Badge>
         </CardTitle>
         <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">

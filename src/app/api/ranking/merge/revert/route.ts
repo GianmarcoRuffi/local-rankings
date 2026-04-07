@@ -1,45 +1,39 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
-import { stages, rankings, stageRanking, generalRanking } from "@/lib/db/schema";
+import {
+  stages,
+  rankings,
+  stageRanking,
+  generalRanking,
+} from "@/lib/db/schema";
 import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { sortRanking } from "@/lib/ranking-logic";
+import { toPositiveInt } from "@/lib/utils";
 
 const revertMergeSchema = z.object({
   stageId: z.union([z.number().int().positive(), z.string()]),
 });
 
-function toPositiveInt(value: unknown): number | null {
-  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
-    return value;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
-
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const body = await request.json();
   const parsedBody = revertMergeSchema.safeParse(body);
-  const stageId = parsedBody.success ? toPositiveInt(parsedBody.data.stageId) : null;
+  const stageId = parsedBody.success
+    ? toPositiveInt(parsedBody.data.stageId)
+    : null;
 
   if (!stageId) {
-    return NextResponse.json({ error: "Valid stageId is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Valid stageId is required" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -56,7 +50,10 @@ export async function POST(request: Request) {
     const stage = stageRows[0];
 
     if (stage.status !== "merged") {
-      return NextResponse.json({ error: "This stage has not been merged" }, { status: 409 });
+      return NextResponse.json(
+        { error: "This stage has not been merged" },
+        { status: 409 },
+      );
     }
 
     // Get the ranking_id from the stage
@@ -90,10 +87,10 @@ export async function POST(request: Request) {
                 eq(generalRanking.rankingId, rankingId!),
                 and(
                   isNull(generalRanking.rankingId),
-                  sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
-                )
-              )
-            )
+                  sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+                ),
+              ),
+            ),
           )
           .limit(1);
 
@@ -127,16 +124,20 @@ export async function POST(request: Request) {
         .where(eq(stages.id, stageId));
 
       const allPlayers = await tx
-        .select({ id: generalRanking.id, totalPoints: generalRanking.totalPoints, t1: generalRanking.t1 })
+        .select({
+          id: generalRanking.id,
+          totalPoints: generalRanking.totalPoints,
+          t1: generalRanking.t1,
+        })
         .from(generalRanking)
         .where(
           or(
             eq(generalRanking.rankingId, rankingId!),
             and(
               isNull(generalRanking.rankingId),
-              sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
-            )
-          )
+              sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+            ),
+          ),
         );
 
       if (allPlayers.length > 0) {
@@ -145,7 +146,7 @@ export async function POST(request: Request) {
             id: p.id,
             total_points: p.totalPoints,
             t1: p.t1 || 0,
-          }))
+          })),
         );
 
         for (let i = 0; i < sorted.length; i++) {
@@ -162,7 +163,10 @@ export async function POST(request: Request) {
       message: `Merge della tappa "${stage.name}" annullato`,
     });
   } catch (error) {
-    console.error("Error reverting merge:", error);
-    return NextResponse.json({ error: "Failed to revert merge" }, { status: 500 });
+    logger.error("Error reverting merge:", { error });
+    return NextResponse.json(
+      { error: "Failed to revert merge" },
+      { status: 500 },
+    );
   }
 }

@@ -1,48 +1,39 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
-import { stages, rankings, stageRanking, generalRanking } from "@/lib/db/schema";
+import {
+  stages,
+  rankings,
+  stageRanking,
+  generalRanking,
+} from "@/lib/db/schema";
 import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { sortRanking } from "@/lib/ranking-logic";
+import { logger } from "@/lib/logger";
+import { toPositiveInt } from "@/lib/utils";
 
 const mergeSchema = z.object({
   stageId: z.union([z.number().int().positive(), z.string()]),
 });
 
-function toPositiveInt(value: unknown): number | null {
-  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
-    return value;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
-
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   try {
     const body = await request.json();
     const parsedBody = mergeSchema.safeParse(body);
-    const stageId = parsedBody.success ? toPositiveInt(parsedBody.data.stageId) : null;
+    const stageId = parsedBody.success
+      ? toPositiveInt(parsedBody.data.stageId)
+      : null;
 
     if (!stageId) {
       return NextResponse.json(
         { error: "Valid stageId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -61,7 +52,7 @@ export async function POST(request: Request) {
     if (stage.status === "merged") {
       return NextResponse.json(
         { error: "This stage has already been merged" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -84,83 +75,100 @@ export async function POST(request: Request) {
       .where(eq(stageRanking.stageId, stageId))
       .orderBy(stageRanking.position);
 
-    await db.transaction(async (tx) => {
-      for (const player of stagePlayers) {
-        const existing = await tx
-          .select()
+    try {
+      await db.transaction(async (tx) => {
+        for (const player of stagePlayers) {
+          const existing = await tx
+            .select()
+            .from(generalRanking)
+            .where(
+              and(
+                sql`LOWER(${generalRanking.name}) = LOWER(${player.name})`,
+                or(
+                  eq(generalRanking.rankingId, rankingId!),
+                  and(
+                    isNull(generalRanking.rankingId),
+                    sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+                  ),
+                ),
+              ),
+            )
+            .for("update")
+            .limit(1);
+
+          if (existing.length > 0) {
+            const current = existing[0];
+            await tx
+              .update(generalRanking)
+              .set({
+                totalPoints: current.totalPoints + (player.pointsAwarded || 0),
+                t1: (current.t1 || 0) + (player.t1 || 0),
+                presenze: (current.presenze || 0) + (player.presenze || 1),
+                updatedAt: new Date(),
+              })
+              .where(eq(generalRanking.id, current.id));
+          } else {
+            await tx.insert(generalRanking).values({
+              name: player.name,
+              rankingId: rankingId,
+              totalPoints: player.pointsAwarded || 0,
+              t1: player.t1 || 0,
+              presenze: player.presenze || 1,
+              updatedAt: new Date(),
+            });
+          }
+        }
+
+        await tx
+          .update(stages)
+          .set({ status: "merged", updatedAt: new Date() })
+          .where(eq(stages.id, stageId));
+
+        // Riordina la classifica generale per questo ranking
+        const allPlayers = await tx
+          .select({
+            id: generalRanking.id,
+            totalPoints: generalRanking.totalPoints,
+            t1: generalRanking.t1,
+          })
           .from(generalRanking)
           .where(
-            and(
-              sql`LOWER(${generalRanking.name}) = LOWER(${player.name})`,
-              or(
-                eq(generalRanking.rankingId, rankingId!),
-                and(
-                  isNull(generalRanking.rankingId),
-                  sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
-                )
-              )
-            )
-          )
-          .limit(1);
+            or(
+              eq(generalRanking.rankingId, rankingId!),
+              and(
+                isNull(generalRanking.rankingId),
+                sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+              ),
+            ),
+          );
 
-        if (existing.length > 0) {
-          const current = existing[0];
-          await tx
-            .update(generalRanking)
-            .set({
-              totalPoints: current.totalPoints + (player.pointsAwarded || 0),
-              t1: (current.t1 || 0) + (player.t1 || 0),
-              presenze: (current.presenze || 0) + (player.presenze || 1),
-              updatedAt: new Date(),
-            })
-            .where(eq(generalRanking.id, current.id));
-        } else {
-          await tx.insert(generalRanking).values({
-            name: player.name,
-            rankingId: rankingId,
-            totalPoints: player.pointsAwarded || 0,
-            t1: player.t1 || 0,
-            presenze: player.presenze || 1,
-            updatedAt: new Date(),
-          });
-        }
-      }
-
-      await tx
-        .update(stages)
-        .set({ status: "merged", updatedAt: new Date() })
-        .where(eq(stages.id, stageId));
-
-      // Riordina la classifica generale per questo ranking
-      const allPlayers = await tx
-        .select({ id: generalRanking.id, totalPoints: generalRanking.totalPoints, t1: generalRanking.t1 })
-        .from(generalRanking)
-        .where(
-          or(
-            eq(generalRanking.rankingId, rankingId!),
-            and(
-              isNull(generalRanking.rankingId),
-              sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`
-            )
-          )
+        const sorted = sortRanking(
+          allPlayers.map((p) => ({
+            id: p.id,
+            total_points: p.totalPoints,
+            t1: p.t1 || 0,
+          })),
         );
 
-      const sorted = sortRanking(
-        allPlayers.map((p) => ({
-          id: p.id,
-          total_points: p.totalPoints,
-          t1: p.t1 || 0,
-        }))
+        // Aggiorna le posizioni
+        for (let i = 0; i < sorted.length; i++) {
+          await tx
+            .update(generalRanking)
+            .set({ position: i + 1 })
+            .where(eq(generalRanking.id, sorted[i].id));
+        }
+      });
+    } catch (transactionError) {
+      logger.error("Transaction failed during stage merge", {
+        stageId,
+        stageName: stage.name,
+        error: transactionError,
+      });
+      return NextResponse.json(
+        { error: "Failed to merge stage due to transaction error" },
+        { status: 500 },
       );
-
-      // Aggiorna le posizioni
-      for (let i = 0; i < sorted.length; i++) {
-        await tx
-          .update(generalRanking)
-          .set({ position: i + 1 })
-          .where(eq(generalRanking.id, sorted[i].id));
-      }
-    });
+    }
 
     return NextResponse.json({
       success: true,
@@ -168,10 +176,10 @@ export async function POST(request: Request) {
       playersUpdated: stagePlayers.length,
     });
   } catch (error) {
-    console.error("Error merging stage:", error);
+    logger.error("Failed to merge stage", { error });
     return NextResponse.json(
       { error: "Failed to merge stage" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

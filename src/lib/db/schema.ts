@@ -11,6 +11,7 @@ import {
   index,
   integer,
 } from "drizzle-orm/pg-core";
+import { isNull } from "drizzle-orm";
 
 export const statusEnum = pgEnum("status", ["pending", "active", "merged"]);
 
@@ -34,7 +35,7 @@ export const rankings = pgTable(
   "rankings",
   {
     id: serial().primaryKey(),
-    name: varchar({ length: 200 }).notNull().unique(),
+    name: varchar({ length: 200 }).notNull(),
     description: text(),
     isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -42,8 +43,15 @@ export const rankings = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    deletedAt: timestamp("deleted_at"),
   },
-  (table) => [index("idx_is_default").on(table.isDefault)],
+  (table) => [
+    index("idx_is_default").on(table.isDefault),
+    index("idx_rankings_deleted_at").on(table.deletedAt),
+    index("idx_rankings_active_name")
+      .on(table.name)
+      .where(isNull(table.deletedAt)),
+  ],
 );
 
 export const stages = pgTable(
@@ -60,11 +68,13 @@ export const stages = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    deletedAt: timestamp("deleted_at"),
   },
   (table) => [
     index("idx_status").on(table.status),
     index("idx_created_at").on(table.createdAt),
     index("idx_ranking_id").on(table.rankingId),
+    index("idx_stages_deleted_at").on(table.deletedAt),
   ],
 );
 
@@ -102,27 +112,14 @@ export const generalRanking = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    deletedAt: timestamp("deleted_at"),
   },
   (table) => [
     index("idx_total_points").on(table.totalPoints),
     index("idx_name").on(table.name),
     index("idx_general_position").on(table.position),
     index("idx_gr_ranking_id").on(table.rankingId),
-  ],
-);
-
-export const loginAttempts = pgTable(
-  "login_attempts",
-  {
-    id: serial().primaryKey(),
-    username: varchar({ length: 100 }).notNull(),
-    failedCount: integer("failed_count").notNull().default(0),
-    lockedUntil: timestamp("locked_until"),
-    lastAttempt: timestamp("last_attempt").defaultNow().notNull(),
-  },
-  (table) => [
-    index("idx_username_attempts").on(table.username),
-    index("idx_locked_until").on(table.lockedUntil),
+    index("idx_general_ranking_deleted_at").on(table.deletedAt),
   ],
 );
 

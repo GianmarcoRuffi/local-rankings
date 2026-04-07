@@ -223,9 +223,10 @@ export function GeneralRankingTable() {
       if (res.ok) {
         toast({
           title: "Classifica azzerata",
-          description: "Tutti i dati della classifica sono stati eliminati.",
+          description: "Tutti i dati della classifica sono stati spostati nel cestino.",
           variant: "success" as Parameters<typeof toast>[0]["variant"],
         });
+        // Aggiorna immediatamente la lista locale
         setPlayers([]);
         setResetDialogOpen(false);
       } else {
@@ -740,10 +741,10 @@ export function GeneralRankingTable() {
               Azzerare la classifica?
             </DialogTitle>
             <DialogDescription>
-              Stai per eliminare tutti i dati della classifica{" "}
-              <strong>&quot;{selectedRanking?.name}&quot;</strong>. Questa
-              operazione è <strong>irreversibile</strong>: tutti i punti, T1,
-              presenze e posizioni verranno cancellati definitivamente.
+              Stai per azzerare tutti i dati della classifica{" "}
+              <strong>&quot;{selectedRanking?.name}&quot;</strong>. I dati
+              verranno spostati nel cestino e potranno essere ripristinati entro 5 giorni.
+              Tutti i punti, T1, presenze e posizioni verranno azzerati.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

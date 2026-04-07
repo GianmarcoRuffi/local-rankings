@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { rankings } from "@/lib/db/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 
@@ -17,6 +17,7 @@ export async function GET() {
     const rows = await db
       .select()
       .from(rankings)
+      .where(isNull(rankings.deletedAt))
       .orderBy(desc(rankings.isDefault), asc(rankings.name));
     return NextResponse.json(rows);
   } catch (error) {

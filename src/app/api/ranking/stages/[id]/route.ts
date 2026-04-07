@@ -121,12 +121,13 @@ export async function DELETE(
       return NextResponse.json({ error: "Stage not found" }, { status: 404 });
     }
 
-    await db.transaction(async (tx) => {
-      await tx.delete(stageRanking).where(eq(stageRanking.stageId, stageId));
-      await tx.delete(stages).where(eq(stages.id, stageId));
-    });
+    // Soft delete della tappa
+    await db
+      .update(stages)
+      .set({ deletedAt: new Date() })
+      .where(eq(stages.id, stageId));
 
-    return NextResponse.json({ success: true, message: "Tappa eliminata" });
+    return NextResponse.json({ success: true, message: "Tappa spostata nel cestino" });
   } catch (error) {
     logger.error("Error deleting stage:", { error });
     return NextResponse.json(

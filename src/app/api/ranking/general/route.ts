@@ -17,11 +17,14 @@ export async function GET(request: Request) {
     );
     const offset = (page - 1) * limit;
 
-    const query = db.select().from(generalRanking);
+    let query = db.select().from(generalRanking).$dynamic();
+
+    // Exclude soft-deleted entries
+    query = query.where(isNull(generalRanking.deletedAt));
 
     if (rankingId) {
       // Include entries for this specific ranking
-      query.where(
+      query = query.where(
         or(
           eq(generalRanking.rankingId, rankingId),
           and(

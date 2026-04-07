@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { rankings, generalRanking, stages } from "@/lib/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { toPositiveInt } from "@/lib/utils";
 
@@ -145,25 +145,79 @@ export async function DELETE(
       );
     }
 
-    await db.transaction(async (tx) => {
-      // Delete all general ranking entries for this ranking
-      await tx
-        .delete(generalRanking)
-        .where(eq(generalRanking.rankingId, rankingId));
+    // Check for active (non-deleted) data in the circuit if the user is trying to delete it
+    // Actually, we want to allow cascading soft delete, so we can comment or remove this block
+    // based on the requirement to allow easy trash movement.
+    // The review suggests that the block below prevents cascading soft-delete from ever executing.
+    
+    /* 
+    const activeGeneralEntries = await db
+      .select()
+      .from(generalRanking)
+      .where(
+        and(
+          eq(generalRanking.rankingId, rankingId),
+          isNull(generalRanking.deletedAt)
+        )
+      )
+      .limit(1);
 
-      // Set ranking_id to NULL for stages linked to this ranking
+    const activeStages = await db
+      .select()
+      .from(stages)
+      .where(
+        and(
+          eq(stages.rankingId, rankingId),
+          isNull(stages.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (activeGeneralEntries.length > 0 || activeStages.length > 0) {
+      return NextResponse.json(
+        { 
+          error: "Non è possibile cancellare un circuito contenente dei dati. Rimuovi prima tutte le tappe e i dati della classifica generale.",
+          hasActiveData: true,
+        },
+        { status: 400 }
+      );
+    }
+    */
+
+    // Perform soft delete on the ranking and its related data in a transaction
+    await db.transaction(async (tx) => {
+      // Soft delete the ranking
+      await tx
+        .update(rankings)
+        .set({ deletedAt: new Date() })
+        .where(eq(rankings.id, rankingId));
+
+      // Soft delete any associated general ranking data
+      await tx
+        .update(generalRanking)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(generalRanking.rankingId, rankingId),
+            isNull(generalRanking.deletedAt)
+          )
+        );
+
+      // Soft delete any associated stages
       await tx
         .update(stages)
-        .set({ rankingId: null })
-        .where(eq(stages.rankingId, rankingId));
-
-      // Delete the ranking
-      await tx.delete(rankings).where(eq(rankings.id, rankingId));
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(stages.rankingId, rankingId),
+            isNull(stages.deletedAt)
+          )
+        );
     });
 
     return NextResponse.json({
       success: true,
-      message: "Ranking deleted successfully",
+      message: "Ranking spostato nel cestino",
     });
   } catch (error) {
     logger.error("Error deleting ranking:", { error });

@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 
 // Site configuration constants for consistent metadata
 const siteConfig = {
-  title: "Rankings Manager",
+  title: "Ranking Manager",
   description: "visualizza e gestisci le classifiche generali dei tornei.",
 };
 

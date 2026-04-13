@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 
 export const runtime = 'edge';
 
-export const alt = 'Rankings Manager Trophy';
+export const alt = 'Ranking Manager Trophy';
 export const size = {
   width: 1200,
   height: 630,
@@ -63,7 +63,7 @@ export default function Image() {
             display: 'flex',
           }}
         >
-          Rankings Manager
+          Ranking Manager
         </div>
         <div
           style={{

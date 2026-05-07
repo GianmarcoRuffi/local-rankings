@@ -30,6 +30,7 @@ export default function LoginPage() {
   const [captchaToken, setCaptchaToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const turnstileSiteKey =
     typeof window === "undefined"
       ? process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
@@ -74,8 +75,10 @@ export default function LoginPage() {
         setCaptchaToken("");
         window.turnstile?.reset();
       } else {
+        setRedirecting(true);
         // Forza reload completo per assicurare che il cookie venga letto
         window.location.href = "/dashboard";
+        return;
       }
     } catch {
       setError("Errore di connessione");
@@ -155,9 +158,9 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || !isTurnstileConfigured}
+                disabled={loading || redirecting || !isTurnstileConfigured}
               >
-                {loading ? "Accesso in corso..." : "Accedi"}
+                {loading || redirecting ? "Accesso in corso..." : "Accedi"}
               </Button>
             </form>
           </CardContent>

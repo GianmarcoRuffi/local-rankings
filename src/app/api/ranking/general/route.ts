@@ -9,9 +9,9 @@ export async function GET(request: Request) {
 
     // Valida i parametri query
     const validation = generalRankingQuerySchema.safeParse({
-      rankingId: searchParams.get("rankingId"),
-      page: searchParams.get("page"),
-      limit: searchParams.get("limit"),
+      rankingId: searchParams.get("rankingId") ?? undefined,
+      page: searchParams.get("page") ?? undefined,
+      limit: searchParams.get("limit") ?? undefined,
     });
 
     if (!validation.success) {

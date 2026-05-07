@@ -123,6 +123,21 @@ export const generalRanking = pgTable(
   ],
 );
 
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    id: serial().primaryKey(),
+    username: varchar({ length: 100 }).notNull(),
+    failedCount: integer("failed_count").notNull().default(0),
+    lockedUntil: timestamp("locked_until"),
+    lastAttempt: timestamp("last_attempt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_username_attempts").on(table.username),
+    index("idx_locked_until").on(table.lockedUntil),
+  ],
+);
+
 export const sessions = pgTable(
   "sessions",
   {

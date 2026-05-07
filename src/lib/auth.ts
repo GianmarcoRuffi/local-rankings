@@ -3,30 +3,114 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { users, loginAttempts } from "@/lib/db/schema";
+import { eq, and, lt } from "drizzle-orm";
 import { env } from "@/lib/env";
+import {
+  MAX_FAILED_LOGIN_ATTEMPTS,
+  LOGIN_LOCK_WINDOW_MS,
+  LOGIN_ATTEMPTS_CLEANUP_MS,
+} from "@/lib/constants";
 import { logger } from "@/lib/logger";
 
-// NOTE: loginAttempts table removed - rate limiting disabled
-// TODO: Re-implement with Redis or session-based approach
+async function isTemporarilyLocked(username: string): Promise<boolean> {
+  try {
+    const records = await db
+      .select()
+      .from(loginAttempts)
+      .where(eq(loginAttempts.username, username))
+      .limit(1);
 
-async function isTemporarilyLocked(_username: string): Promise<boolean> {
-  // Stub: rate limiting disabled after loginAttempts removal
-  return false;
+    if (records.length === 0) {
+      return false;
+    }
+
+    const record = records[0];
+
+    if (record.lockedUntil && record.lockedUntil > new Date()) {
+      return true;
+    }
+
+    if (record.lockedUntil && record.lockedUntil <= new Date()) {
+      await db
+        .delete(loginAttempts)
+        .where(eq(loginAttempts.username, username));
+      return false;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 async function registerFailedAttempt(username: string): Promise<void> {
-  // Stub: rate limiting disabled after loginAttempts removal
-  logger.debug("Failed login attempt (tracking disabled):", { username });
+  try {
+    const now = new Date();
+    const records = await db
+      .select()
+      .from(loginAttempts)
+      .where(eq(loginAttempts.username, username))
+      .limit(1);
+
+    if (records.length === 0) {
+      await db.insert(loginAttempts).values({
+        username,
+        failedCount: 1,
+        lastAttempt: now,
+      });
+      return;
+    }
+
+    const record = records[0];
+    const nextCount = record.failedCount + 1;
+
+    if (nextCount >= MAX_FAILED_LOGIN_ATTEMPTS) {
+      await db
+        .update(loginAttempts)
+        .set({
+          failedCount: 0,
+          lockedUntil: new Date(now.getTime() + LOGIN_LOCK_WINDOW_MS),
+          lastAttempt: now,
+        })
+        .where(eq(loginAttempts.username, username));
+      return;
+    }
+
+    await db
+      .update(loginAttempts)
+      .set({
+        failedCount: nextCount,
+        lastAttempt: now,
+      })
+      .where(eq(loginAttempts.username, username));
+  } catch (error) {
+    logger.error("Failed to register login attempt", { username, error });
+  }
 }
 
-async function clearAttempts(_username: string): Promise<void> {
-  // Stub: rate limiting disabled after loginAttempts removal
+async function clearAttempts(username: string): Promise<void> {
+  try {
+    await db.delete(loginAttempts).where(eq(loginAttempts.username, username));
+  } catch (error) {
+    logger.error("Failed to clear login attempts", { username, error });
+  }
 }
 
 async function cleanupOldAttempts(): Promise<void> {
-  // Stub: rate limiting disabled after loginAttempts removal
+  try {
+    const cutoff = new Date(Date.now() - LOGIN_ATTEMPTS_CLEANUP_MS);
+    await db
+      .delete(loginAttempts)
+      .where(
+        and(
+          lt(loginAttempts.lastAttempt, cutoff),
+          eq(loginAttempts.failedCount, 0),
+        ),
+      );
+  } catch (error) {
+    logger.error("Failed to cleanup old login attempts", { error });
+  }
 }
 
 const credentialSchema = z.object({

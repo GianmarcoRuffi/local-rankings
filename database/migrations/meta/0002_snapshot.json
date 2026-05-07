@@ -1,5 +1,5 @@
 {
-  "id": "8a001144-81a0-4c3a-88d2-2b04eaedc603",
+  "id": "675e85f2-6139-4a5f-abad-c5b22d79fa09",
   "prevId": "e9d90b39-5279-4b47-83cd-bd926a059a35",
   "version": "7",
   "dialect": "postgresql",
@@ -141,6 +141,82 @@
           "columns": [
             {
               "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.login_attempts": {
+      "name": "login_attempts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "failed_count": {
+          "name": "failed_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_attempt": {
+          "name": "last_attempt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_username_attempts": {
+          "name": "idx_username_attempts",
+          "columns": [
+            {
+              "expression": "username",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_locked_until": {
+          "name": "idx_locked_until",
+          "columns": [
+            {
+              "expression": "locked_until",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -1,5 +1,3 @@
-ALTER TABLE "login_attempts" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
-DROP TABLE "login_attempts" CASCADE;--> statement-breakpoint
 ALTER TABLE "rankings" DROP CONSTRAINT "rankings_name_unique";--> statement-breakpoint
 ALTER TABLE "general_ranking" ADD COLUMN "deleted_at" timestamp;--> statement-breakpoint
 ALTER TABLE "rankings" ADD COLUMN "deleted_at" timestamp;--> statement-breakpoint

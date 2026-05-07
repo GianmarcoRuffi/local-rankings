@@ -13,9 +13,9 @@ const pool =
     connectionString: env.DATABASE_URL,
     ssl:
       process.env.NODE_ENV === "production"
-        ? { rejectUnauthorized: false }
+        ? { rejectUnauthorized: true }
         : undefined,
-    max: 10,
+    max: parseInt(process.env.DB_POOL_SIZE || "10", 10),
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
   });

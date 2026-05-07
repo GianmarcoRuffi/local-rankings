@@ -4,14 +4,9 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { BCRYPT_ROUNDS } from "@/lib/constants";
 import { logger } from "@/lib/logger";
-
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
-  newPassword: z.string().min(8),
-});
+import { changePasswordSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth(request);
@@ -29,7 +24,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { currentPassword, newPassword } = parsedBody.data;
+  const { oldPassword: currentPassword, newPassword } = parsedBody.data;
 
   if (newPassword === currentPassword) {
     return NextResponse.json(

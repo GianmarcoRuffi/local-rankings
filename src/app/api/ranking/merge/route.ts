@@ -12,6 +12,7 @@ import { z } from "zod";
 import { sortRanking } from "@/lib/ranking-logic";
 import { logger } from "@/lib/logger";
 import { toPositiveInt } from "@/lib/utils";
+import { invalidateCache } from "@/lib/cache";
 
 const mergeSchema = z.object({
   stageId: z.union([z.number().int().positive(), z.string()]),
@@ -169,6 +170,8 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
+
+    invalidateCache(`general-ranking:${rankingId ?? "all"}`);
 
     return NextResponse.json({
       success: true,

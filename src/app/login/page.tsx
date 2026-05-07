@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Script from "next/script";
-import { useRouter } from "next/navigation";
 import { Trophy } from "lucide-react";
 import {
   Card,
@@ -21,20 +20,21 @@ declare global {
     turnstile?: {
       reset: () => void;
     };
+    __NEXT_PUBLIC_TURNSTILE_SITE_KEY__?: string;
   }
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const turnstileSiteKey =
     typeof window === "undefined"
       ? process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-      : (window as any).__NEXT_PUBLIC_TURNSTILE_SITE_KEY__ ||
+      : window.__NEXT_PUBLIC_TURNSTILE_SITE_KEY__ ||
         process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const isTurnstileConfigured = Boolean(turnstileSiteKey);
 
@@ -75,8 +75,10 @@ export default function LoginPage() {
         setCaptchaToken("");
         window.turnstile?.reset();
       } else {
+        setRedirecting(true);
         // Forza reload completo per assicurare che il cookie venga letto
         window.location.href = "/dashboard";
+        return;
       }
     } catch {
       setError("Errore di connessione");
@@ -156,9 +158,9 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || !isTurnstileConfigured}
+                disabled={loading || redirecting || !isTurnstileConfigured}
               >
-                {loading ? "Accesso in corso..." : "Accedi"}
+                {loading || redirecting ? "Accesso in corso..." : "Accedi"}
               </Button>
             </form>
           </CardContent>

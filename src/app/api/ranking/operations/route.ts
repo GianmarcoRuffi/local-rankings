@@ -6,6 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { sortRanking, capitalizeName } from "@/lib/ranking-logic";
 import { logger } from "@/lib/logger";
+import { invalidateCache } from "@/lib/cache";
 
 const operationSchema = z.object({
   operation: z.enum([
@@ -68,6 +69,10 @@ export async function POST(request: NextRequest) {
           }
         });
 
+        if (normalizedTarget === "general") {
+          invalidateCache("general-ranking:");
+        }
+
         return NextResponse.json({
           success: true,
           message: `Ordinamento alfabetico completato`,
@@ -97,6 +102,10 @@ export async function POST(request: NextRequest) {
           }
         });
 
+        if (normalizedTarget === "general") {
+          invalidateCache("general-ranking:");
+        }
+
         return NextResponse.json({
           success: true,
           message: `Ordinamento per punti completato`,
@@ -122,6 +131,10 @@ export async function POST(request: NextRequest) {
             }
           }
         });
+
+        if (normalizedTarget === "general") {
+          invalidateCache("general-ranking:");
+        }
 
         return NextResponse.json({
           success: true,
@@ -151,6 +164,10 @@ export async function POST(request: NextRequest) {
               .where(eq(table.id, sorted[i].id));
           }
         });
+
+        if (normalizedTarget === "general") {
+          invalidateCache("general-ranking:");
+        }
 
         return NextResponse.json({
           success: true,

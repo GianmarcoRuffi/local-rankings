@@ -1,57 +1,30 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { generalRanking } from "@/lib/db/schema";
-import { eq, or, and, isNull, sql } from "drizzle-orm";
-import { sortRanking } from "@/lib/ranking-logic";
 import { logger } from "@/lib/logger";
+import { generalRankingQuerySchema } from "@/lib/validations";
+import { getCachedGeneralRanking } from "@/lib/cache";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const rankingIdStr = searchParams.get("rankingId");
-    const rankingId = rankingIdStr ? parseInt(rankingIdStr) : null;
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(
-      1000,
-      Math.max(1, parseInt(searchParams.get("limit") || "1000", 10)),
-    );
-    const offset = (page - 1) * limit;
 
-    let query = db.select().from(generalRanking).$dynamic();
+    const validation = generalRankingQuerySchema.safeParse({
+      rankingId: searchParams.get("rankingId") ?? undefined,
+      page: searchParams.get("page") ?? undefined,
+      limit: searchParams.get("limit") ?? undefined,
+    });
 
-    // Exclude soft-deleted entries
-    query = query.where(isNull(generalRanking.deletedAt));
-
-    if (rankingId) {
-      // Include entries for this specific ranking
-      query = query.where(
-        or(
-          eq(generalRanking.rankingId, rankingId),
-          and(
-            isNull(generalRanking.rankingId),
-            sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
-          ),
-        ),
+    if (!validation.success) {
+      const firstError = validation.error.issues[0];
+      return NextResponse.json(
+        { error: firstError?.message || "Parametri non validi" },
+        { status: 400 },
       );
     }
 
-    const rows = await query;
+    const { rankingId, page, limit } = validation.data;
+    const offset = (page - 1) * limit;
 
-    // Ordina usando il comparatore personalizzato
-    const sorted = sortRanking(
-      rows.map((row) => ({
-        ...row,
-        total_points: row.totalPoints ?? 0,
-        t1: row.t1 ?? 0,
-      })),
-    );
-
-    // Aggiungi la posizione
-    const ranked = sorted.map((row, index) => ({
-      ...row,
-      position: index + 1,
-    }));
-
+    const ranked = await getCachedGeneralRanking(rankingId);
     const total = ranked.length;
     const paginatedRanked = ranked.slice(offset, offset + limit);
 

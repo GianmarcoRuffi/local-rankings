@@ -1,14 +1,13 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { rankings, generalRanking, stages } from "@/lib/db/schema";
 import { not, isNull, sql } from "drizzle-orm";
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   try {
@@ -36,7 +35,7 @@ export async function GET() {
 
     const count = rankingsCount + generalEntriesCount + stagesCount;
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       count,
       rankings: rankingsCount,
       generalEntries: generalEntriesCount,
@@ -46,7 +45,7 @@ export async function GET() {
     console.error("Error fetching trash count:", error);
     return NextResponse.json(
       { error: "Failed to fetch trash count" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

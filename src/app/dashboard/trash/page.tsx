@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useSession";
 import {
   Trash2,
   RotateCcw,
@@ -125,7 +125,7 @@ export default function TrashPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchTrash();
+      void Promise.resolve().then(fetchTrash);
     }
   }, [isAuthenticated, fetchTrash]);
 

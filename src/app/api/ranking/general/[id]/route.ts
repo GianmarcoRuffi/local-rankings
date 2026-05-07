@@ -6,6 +6,7 @@ import { generalRanking } from "@/lib/db/schema";
 import { eq, or, and, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
 import { toPositiveInt } from "@/lib/utils";
+import { invalidateCache } from "@/lib/cache";
 
 export async function PATCH(
   request: NextRequest,
@@ -57,28 +58,30 @@ export async function PATCH(
       })
       .where(eq(generalRanking.id, playerId));
 
-    // Fetch all players in the same ranking
-    const query = db
-      .select({
-        id: generalRanking.id,
-        totalPoints: generalRanking.totalPoints,
-        t1: generalRanking.t1,
-      })
-      .from(generalRanking);
-
-    if (effectiveRankingId) {
-      query.where(
-        or(
-          eq(generalRanking.rankingId, effectiveRankingId),
-          and(
-            isNull(generalRanking.rankingId),
-            sql`${effectiveRankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
-          ),
-        ),
-      );
-    }
-
-    const allPlayers = await query;
+    const allPlayers = effectiveRankingId
+      ? await db
+          .select({
+            id: generalRanking.id,
+            totalPoints: generalRanking.totalPoints,
+            t1: generalRanking.t1,
+          })
+          .from(generalRanking)
+          .where(
+            or(
+              eq(generalRanking.rankingId, effectiveRankingId),
+              and(
+                isNull(generalRanking.rankingId),
+                sql`${effectiveRankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+              ),
+            ),
+          )
+      : await db
+          .select({
+            id: generalRanking.id,
+            totalPoints: generalRanking.totalPoints,
+            t1: generalRanking.t1,
+          })
+          .from(generalRanking);
 
     const sorted = sortRanking(
       allPlayers.map((p) => ({
@@ -96,6 +99,8 @@ export async function PATCH(
           .where(eq(generalRanking.id, sorted[i].id));
       }
     });
+
+    invalidateCache(`general-ranking:${effectiveRankingId ?? "all"}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

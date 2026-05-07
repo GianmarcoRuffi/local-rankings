@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import { SESSION_DURATION_SECONDS } from "@/lib/constants";
 
 // Usa direttamente process.env per compatibilità Edge Runtime
 const getJWTSecret = () => {
@@ -10,8 +11,6 @@ const getJWTSecret = () => {
 
   return new TextEncoder().encode(secret);
 };
-
-const SESSION_DURATION_SECONDS = 20 * 60; // 20 minuti
 
 export interface SessionPayload {
   userId: number;

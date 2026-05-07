@@ -58,7 +58,9 @@ export const stages = pgTable(
   "stages",
   {
     id: serial().primaryKey(),
-    rankingId: integer("ranking_id"),
+    rankingId: integer("ranking_id").references(() => rankings.id, {
+      onDelete: "cascade",
+    }),
     name: varchar({ length: 200 }).notNull(),
     date: date(),
     pdfFilename: varchar("pdf_filename", { length: 255 }),
@@ -82,7 +84,11 @@ export const stageRanking = pgTable(
   "stage_ranking",
   {
     id: serial().primaryKey(),
-    stageId: integer("stage_id").notNull(),
+    stageId: integer("stage_id")
+      .notNull()
+      .references(() => stages.id, {
+        onDelete: "cascade",
+      }),
     position: integer().notNull(),
     name: varchar({ length: 200 }).notNull(),
     score: decimal({ precision: 10, scale: 3 }),
@@ -101,7 +107,9 @@ export const generalRanking = pgTable(
   "general_ranking",
   {
     id: serial().primaryKey(),
-    rankingId: integer("ranking_id"),
+    rankingId: integer("ranking_id").references(() => rankings.id, {
+      onDelete: "cascade",
+    }),
     position: integer().default(0),
     name: varchar({ length: 200 }).notNull(),
     totalPoints: integer("total_points").notNull().default(0),
@@ -142,7 +150,11 @@ export const sessions = pgTable(
   "sessions",
   {
     id: serial().primaryKey(),
-    userId: integer("user_id").notNull(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "cascade",
+      }),
     token: varchar({ length: 255 }).notNull().unique(),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

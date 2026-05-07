@@ -12,6 +12,7 @@ import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { sortRanking } from "@/lib/ranking-logic";
 import { toPositiveInt } from "@/lib/utils";
+import { invalidateCache } from "@/lib/cache";
 
 const revertMergeSchema = z.object({
   stageId: z.union([z.number().int().positive(), z.string()]),
@@ -157,6 +158,8 @@ export async function POST(request: NextRequest) {
         }
       }
     });
+
+    invalidateCache(`general-ranking:${rankingId ?? "all"}`);
 
     return NextResponse.json({
       success: true,

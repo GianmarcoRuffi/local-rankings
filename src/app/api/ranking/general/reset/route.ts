@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { generalRanking } from "@/lib/db/schema";
 import { eq, or, and, isNull, sql } from "drizzle-orm";
+import { invalidateCache } from "@/lib/cache";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth(request);
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
             isNull(generalRanking.deletedAt),
           ),
         );
+      invalidateCache(`general-ranking:${rankingId}`);
       return NextResponse.json({
         success: true,
         message: "Classifica azzerata",
@@ -50,6 +52,7 @@ export async function POST(request: NextRequest) {
         .update(generalRanking)
         .set({ deletedAt: new Date() })
         .where(isNull(generalRanking.deletedAt));
+      invalidateCache("general-ranking:");
       return NextResponse.json({
         success: true,
         message: "Tutte le classifiche azzerate",

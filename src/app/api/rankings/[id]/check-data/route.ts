@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { rankings, generalRanking, stages } from "@/lib/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
@@ -15,12 +14,12 @@ function parsePositiveInt(value: string): number | null {
 }
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
   }
 
   const { id } = await params;
@@ -49,8 +48,8 @@ export async function GET(
       .where(
         and(
           eq(generalRanking.rankingId, rankingId),
-          isNull(generalRanking.deletedAt)
-        )
+          isNull(generalRanking.deletedAt),
+        ),
       )
       .limit(1);
 
@@ -58,12 +57,7 @@ export async function GET(
     const activeStages = await db
       .select()
       .from(stages)
-      .where(
-        and(
-          eq(stages.rankingId, rankingId),
-          isNull(stages.deletedAt)
-        )
-      )
+      .where(and(eq(stages.rankingId, rankingId), isNull(stages.deletedAt)))
       .limit(1);
 
     const hasGeneralEntries = activeGeneralEntries.length > 0;
@@ -79,7 +73,7 @@ export async function GET(
     console.error("Error checking active data:", error);
     return NextResponse.json(
       { error: "Failed to check active data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

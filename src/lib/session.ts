@@ -1,8 +1,7 @@
 import { db } from "@/lib/db";
 import { sessions, users } from "@/lib/db/schema";
 import { eq, lt } from "drizzle-orm";
-
-const SESSION_DURATION_MS = 20 * 60 * 1000;
+import { SESSION_DURATION_MS } from "@/lib/constants";
 
 export function generateSessionToken(): string {
   const array = new Uint8Array(32);

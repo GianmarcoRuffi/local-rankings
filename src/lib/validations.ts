@@ -41,9 +41,7 @@ export const rankingIdSchema = z.object({
     .transform((val) => (val ? parseInt(val, 10) : null)),
 });
 
-export const generalRankingQuerySchema = paginationSchema.merge(
-  rankingIdSchema,
-);
+export const generalRankingQuerySchema = paginationSchema.and(rankingIdSchema);
 
 export const idParamSchema = z.object({
   id: z.string().transform((val) => parseInt(val, 10)),
@@ -118,10 +116,12 @@ export const bulkOperationSchema = z.object({
 // ============================================================================
 
 export const uploadPdfSchema = z.object({
-  file: z.instanceof(File).refine(
-    (file) => file.type === "application/pdf",
-    "Il file deve essere un PDF",
-  ),
+  file: z
+    .instanceof(File)
+    .refine(
+      (file) => file.type === "application/pdf",
+      "Il file deve essere un PDF",
+    ),
   stageName: z.string().trim().min(1).max(200).optional(),
   stageDate: z.string().optional(),
   rankingId: z.number().int().positive().optional(),
@@ -157,7 +157,7 @@ export function validateInput<T>(
   if (result.success) {
     return { success: true, data: result.data };
   }
-  const firstError = result.error.errors[0];
+  const firstError = result.error.issues[0];
   return {
     success: false,
     error: firstError?.message || "Validazione fallita",

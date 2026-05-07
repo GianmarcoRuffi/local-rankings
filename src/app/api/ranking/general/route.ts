@@ -6,7 +6,7 @@ import { getCachedGeneralRanking } from "@/lib/cache";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    
+
     // Valida i parametri query
     const validation = generalRankingQuerySchema.safeParse({
       rankingId: searchParams.get("rankingId"),
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     });
 
     if (!validation.success) {
-      const firstError = validation.error.errors[0];
+      const firstError = validation.error.issues[0];
       return NextResponse.json(
         { error: firstError?.message || "Parametri non validi" },
         { status: 400 },

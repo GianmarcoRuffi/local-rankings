@@ -81,7 +81,7 @@ export async function registerFailedAttempt(username: string): Promise<void> {
           lastAttempt: now,
         })
         .where(eq(loginAttempts.username, username));
-      
+
       logger.warn("User locked due to too many failed attempts", {
         username,
         attempts: nextCount,
@@ -128,7 +128,7 @@ export async function cleanupOldAttempts(): Promise<void> {
           eq(loginAttempts.failedCount, 0),
         ),
       );
-    
+
     logger.debug("Cleaned up old login attempts", { result });
   } catch (error) {
     logger.error("Failed to cleanup old login attempts", { error });

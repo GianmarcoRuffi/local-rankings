@@ -4,6 +4,7 @@ import {
   checkRateLimit,
   getClientIdentifier,
   RATE_LIMITS,
+  type RateLimitConfig,
 } from "@/lib/rate-limit";
 
 const publicApiPaths = ["/api/auth/login", "/api/auth/logout"];
@@ -14,7 +15,7 @@ export async function middleware(request: NextRequest) {
   // Rate limiting per le API routes
   if (pathname.startsWith("/api/")) {
     const identifier = getClientIdentifier(request);
-    let rateLimitConfig = RATE_LIMITS.READ;
+    let rateLimitConfig: RateLimitConfig = RATE_LIMITS.READ;
 
     // Determina il tipo di rate limit in base al percorso e metodo
     if (pathname.includes("/auth/login")) {
@@ -50,10 +51,7 @@ export async function middleware(request: NextRequest) {
 
     // Aggiungi header rate limit alla risposta
     const response = NextResponse.next();
-    response.headers.set(
-      "X-RateLimit-Limit",
-      rateLimitConfig.limit.toString(),
-    );
+    response.headers.set("X-RateLimit-Limit", rateLimitConfig.limit.toString());
     response.headers.set(
       "X-RateLimit-Remaining",
       rateLimitResult.remaining.toString(),

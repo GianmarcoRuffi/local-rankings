@@ -1,74 +1,71 @@
-import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import { generalRanking } from "@/lib/db/schema";
 import { eq, or, and, isNull, sql } from "drizzle-orm";
 import { sortRanking } from "@/lib/ranking-logic";
-
-/**
- * Cache duration in seconds
- */
-const GENERAL_RANKING_CACHE_DURATION = 300; // 5 minuti
+import {
+  GENERAL_RANKING_CACHE_TTL_SECONDS,
+  MILLISECONDS_PER_SECOND,
+} from "@/lib/constants";
 
 export type GeneralRankingRow = {
   id: number;
-  rankingId: number | null;
-  position: number | null;
+  ranking_id: number | null;
+  position: number;
   name: string;
-  totalPoints: number;
-  t1: number | null;
+  total_points: number;
+  t1: number;
   presenze: number;
-  createdAt: Date;
-  updatedAt: Date;
+  created_at: string;
+  updated_at: string;
 };
 
 /**
- * Fetches the general ranking from the database with caching
- * TODO: Fix cache key to support dynamic rankingId parameter
- * Temporarily disabled due to unstable_cache key limitations
+ * Fetches the general ranking from the database with a per-ranking cache key.
  */
-/*
-export const getCachedGeneralRanking = unstable_cache(
-  async (rankingId: number | null) => {
-    const query = db.select().from(generalRanking);
+export async function getCachedGeneralRanking(
+  rankingId: number | null,
+): Promise<GeneralRankingRow[]> {
+  return getCachedData(
+    `general-ranking:${rankingId ?? "all"}`,
+    async () => {
+      const rows = rankingId
+        ? await db
+            .select()
+            .from(generalRanking)
+            .where(
+              or(
+                eq(generalRanking.rankingId, rankingId),
+                and(
+                  isNull(generalRanking.rankingId),
+                  sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+                ),
+              ),
+            )
+        : await db.select().from(generalRanking);
 
-    if (rankingId) {
-      query.where(
-        or(
-          eq(generalRanking.rankingId, rankingId),
-          and(
-            isNull(generalRanking.rankingId),
-            sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
-          ),
-        ),
+      const sorted = sortRanking(
+        rows.map((row) => ({
+          ...row,
+          total_points: row.totalPoints ?? 0,
+          t1: row.t1 ?? 0,
+        })),
       );
-    }
 
-    const rows = await query;
-
-    // Ordina usando il comparatore personalizzato
-    const sorted = sortRanking(
-      rows.map((row) => ({
-        ...row,
+      return sorted.map((row, index) => ({
+        id: row.id,
+        ranking_id: row.rankingId,
+        position: index + 1,
+        name: row.name,
         total_points: row.totalPoints ?? 0,
         t1: row.t1 ?? 0,
-      })),
-    );
-
-    // Aggiungi la posizione
-    const ranked = sorted.map((row, index) => ({
-      ...row,
-      position: index + 1,
-    }));
-
-    return ranked;
-  },
-  (rankingId) => [`general-ranking-${rankingId ?? "all"}`],
-  {
-    revalidate: GENERAL_RANKING_CACHE_DURATION,
-    tags: ["general-ranking"],
-  },
-);
-*/
+        presenze: row.presenze,
+        created_at: row.createdAt.toISOString(),
+        updated_at: row.updatedAt.toISOString(),
+      }));
+    },
+    GENERAL_RANKING_CACHE_TTL_SECONDS,
+  );
+}
 
 /**
  * In-memory cache fallback (for environments where unstable_cache doesn't work)
@@ -78,7 +75,7 @@ const memoryCache = new Map<string, { data: unknown; expiry: number }>();
 export async function getCachedData<T>(
   key: string,
   fetchFn: () => Promise<T>,
-  ttlSeconds: number = 300,
+  ttlSeconds: number = GENERAL_RANKING_CACHE_TTL_SECONDS,
 ): Promise<T> {
   const now = Date.now();
   const cached = memoryCache.get(key);
@@ -90,7 +87,7 @@ export async function getCachedData<T>(
   const data = await fetchFn();
   memoryCache.set(key, {
     data,
-    expiry: now + ttlSeconds * 1000,
+    expiry: now + ttlSeconds * MILLISECONDS_PER_SECOND,
   });
 
   return data;

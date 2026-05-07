@@ -46,7 +46,7 @@ Sistema gestionale per l'organizzazione e il calcolo delle classifiche di tornei
    npm run db:create-user <username> <password> <displayName>
 
    # Inizializza la classifica di default
-   npx tsx scripts/create-default-ranking.ts
+   npm run db:create-default-ranking
    ```
 
 ### Esecuzione

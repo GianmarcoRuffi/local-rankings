@@ -1,3 +1,13 @@
+import {
+  MILLISECONDS_PER_MINUTE,
+  MILLISECONDS_PER_HOUR,
+  RATE_LIMIT_AUTH_MAX_REQUESTS,
+  RATE_LIMIT_CLEANUP_INTERVAL_MS,
+  RATE_LIMIT_READ_MAX_REQUESTS,
+  RATE_LIMIT_UPLOAD_MAX_REQUESTS,
+  RATE_LIMIT_WRITE_MAX_REQUESTS,
+} from "@/lib/constants";
+
 /**
  * Simple in-memory rate limiter
  * For production, consider using Redis-based rate limiting (@upstash/ratelimit)
@@ -9,19 +19,7 @@ interface RateLimitEntry {
 }
 
 const store = new Map<string, RateLimitEntry>();
-
-// Cleanup old entries every 5 minutes
-setInterval(
-  () => {
-    const now = Date.now();
-    for (const [key, entry] of store.entries()) {
-      if (entry.resetAt < now) {
-        store.delete(key);
-      }
-    }
-  },
-  5 * 60 * 1000,
-);
+let lastCleanupAt = 0;
 
 export interface RateLimitConfig {
   /**
@@ -52,6 +50,7 @@ export function checkRateLimit(
   config: RateLimitConfig,
 ): RateLimitResult {
   const now = Date.now();
+  cleanupExpiredEntries(now);
   const key = identifier;
   const entry = store.get(key);
 
@@ -89,32 +88,90 @@ export function checkRateLimit(
   };
 }
 
+function cleanupExpiredEntries(now: number): void {
+  if (now - lastCleanupAt < RATE_LIMIT_CLEANUP_INTERVAL_MS) {
+    return;
+  }
+
+  lastCleanupAt = now;
+  for (const [key, entry] of store.entries()) {
+    if (entry.resetAt < now) {
+      store.delete(key);
+    }
+  }
+}
+
 /**
  * Default rate limit configurations for different endpoints
  */
 export const RATE_LIMITS = {
   // Strict limit for auth endpoints
-  AUTH: { limit: 5, windowMs: 15 * 60 * 1000 }, // 5 req / 15 min
+  AUTH: {
+    limit: RATE_LIMIT_AUTH_MAX_REQUESTS,
+    windowMs: 15 * MILLISECONDS_PER_MINUTE,
+  },
   // Moderate limit for write operations
-  WRITE: { limit: 30, windowMs: 60 * 1000 }, // 30 req / min
+  WRITE: {
+    limit: RATE_LIMIT_WRITE_MAX_REQUESTS,
+    windowMs: MILLISECONDS_PER_MINUTE,
+  },
   // Generous limit for read operations
-  READ: { limit: 100, windowMs: 60 * 1000 }, // 100 req / min
+  READ: {
+    limit: RATE_LIMIT_READ_MAX_REQUESTS,
+    windowMs: MILLISECONDS_PER_MINUTE,
+  },
   // Very strict for upload operations
-  UPLOAD: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 req / hour
+  UPLOAD: {
+    limit: RATE_LIMIT_UPLOAD_MAX_REQUESTS,
+    windowMs: MILLISECONDS_PER_HOUR,
+  },
 } as const;
 
 /**
  * Get client identifier from request
  */
 export function getClientIdentifier(request: Request): string {
-  // Try to get IP from headers
   const headers = new Headers(request.headers);
   const forwarded = headers.get("x-forwarded-for");
   const realIp = headers.get("x-real-ip");
   const cfConnecting = headers.get("cf-connecting-ip");
+  const vercelForwarded = headers.get("x-vercel-forwarded-for");
+  const forwardedFor = headers.get("forwarded");
 
   const ip =
-    cfConnecting || realIp || (forwarded ? forwarded.split(",")[0] : null);
+    firstHeaderIp(cfConnecting) ||
+    firstHeaderIp(vercelForwarded) ||
+    firstHeaderIp(forwarded) ||
+    firstHeaderIp(realIp) ||
+    firstForwardedIp(forwardedFor);
 
-  return ip || "unknown";
+  if (ip) {
+    return `ip:${ip}`;
+  }
+
+  const userAgent = headers.get("user-agent") || "unknown-ua";
+  const acceptLanguage = headers.get("accept-language") || "unknown-lang";
+  return `fallback:${hashIdentifier(`${userAgent}:${acceptLanguage}`)}`;
+}
+
+function firstHeaderIp(value: string | null): string | null {
+  return value?.split(",")[0]?.trim() || null;
+}
+
+function firstForwardedIp(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const first = value.split(",")[0];
+  const match = first.match(/for="?([^";]+)"?/i);
+  return match?.[1]?.replace(/^\[|\]$/g, "").trim() || null;
+}
+
+function hashIdentifier(value: string): string {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 33) ^ value.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
 }

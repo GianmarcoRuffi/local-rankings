@@ -6,7 +6,7 @@ import {
   useState,
   useEffect,
   useCallback,
-  ReactNode,
+  type ReactNode,
 } from "react";
 import { Ranking } from "@/types/ranking";
 
@@ -71,7 +71,7 @@ export function RankingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchRankings();
+    void Promise.resolve().then(fetchRankings);
   }, [fetchRankings]);
 
   const handleSetSelectedRanking = useCallback((ranking: Ranking | null) => {

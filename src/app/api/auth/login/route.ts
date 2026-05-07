@@ -14,6 +14,7 @@ import {
   clearAttempts,
   cleanupOldAttempts,
 } from "@/lib/login-attempts";
+import { SESSION_DURATION_SECONDS } from "@/lib/constants";
 
 async function verifyTurnstileToken(
   token: string,
@@ -145,13 +146,13 @@ export async function POST(request: NextRequest) {
 
     // Imposta il cookie con il JWT usando sia cookies.set che header
     const isProduction = process.env.NODE_ENV === "production";
-    const cookieValue = `session_token=${jwt}; Path=/; HttpOnly; ${isProduction ? "Secure; " : ""}SameSite=Lax; Max-Age=${20 * 60}`;
+    const cookieValue = `session_token=${jwt}; Path=/; HttpOnly; ${isProduction ? "Secure; " : ""}SameSite=Lax; Max-Age=${SESSION_DURATION_SECONDS}`;
 
     response.headers.set("Set-Cookie", cookieValue);
 
     logger.info("Login successful, cookie set", {
       username: user.username,
-      cookieMaxAge: 20 * 60,
+      cookieMaxAge: SESSION_DURATION_SECONDS,
       isProduction,
       cookieLength: jwt.length,
     });

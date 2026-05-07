@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { generalRankingQuerySchema } from "@/lib/validations";
-import { db } from "@/lib/db";
-import { generalRanking } from "@/lib/db/schema";
-import { eq, or, and, isNull, sql } from "drizzle-orm";
-import { sortRanking } from "@/lib/ranking-logic";
+import { getCachedGeneralRanking } from "@/lib/cache";
 
 export async function GET(request: Request) {
   try {
@@ -28,37 +25,7 @@ export async function GET(request: Request) {
     const { rankingId, page, limit } = validation.data;
     const offset = (page - 1) * limit;
 
-    // Query diretta al database (cache temporaneamente rimossa)
-    const query = db.select().from(generalRanking);
-
-    if (rankingId) {
-      query.where(
-        or(
-          eq(generalRanking.rankingId, rankingId),
-          and(
-            isNull(generalRanking.rankingId),
-            sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
-          ),
-        ),
-      );
-    }
-
-    const rows = await query;
-
-    // Ordina usando il comparatore personalizzato
-    const sorted = sortRanking(
-      rows.map((row) => ({
-        ...row,
-        total_points: row.totalPoints ?? 0,
-        t1: row.t1 ?? 0,
-      })),
-    );
-
-    // Aggiungi la posizione
-    const ranked = sorted.map((row, index) => ({
-      ...row,
-      position: index + 1,
-    }));
+    const ranked = await getCachedGeneralRanking(rankingId);
 
     const total = ranked.length;
     const paginatedRanked = ranked.slice(offset, offset + limit);

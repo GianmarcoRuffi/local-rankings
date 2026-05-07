@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useSession } from "@/hooks/useSession";
 import {
   ChevronUp,
@@ -41,6 +41,7 @@ import { GeneralRankingPlayer, SortConfig } from "@/types/ranking";
 import { toast } from "@/hooks/use-toast";
 import { t1Comparator } from "@/lib/ranking-logic";
 import { useRanking } from "@/hooks/useRanking";
+import { MAX_PAGE_SIZE } from "@/lib/constants";
 
 function SortIcon({
   column,
@@ -159,6 +160,30 @@ interface EditState {
   presenze: string;
 }
 
+function SortableHead({
+  column,
+  children,
+  sortConfig,
+  onSort,
+}: {
+  column: string;
+  children: ReactNode;
+  sortConfig: SortConfig;
+  onSort: (column: string) => void;
+}) {
+  return (
+    <TableHead
+      className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
+      onClick={() => onSort(column)}
+    >
+      <div className="flex items-center">
+        {children}
+        <SortIcon column={column} sortConfig={sortConfig} />
+      </div>
+    </TableHead>
+  );
+}
+
 export function GeneralRankingTable() {
   const { data: session } = useSession();
   const isAuthenticated = !!session;
@@ -188,7 +213,7 @@ export function GeneralRankingTable() {
 
     setLoading(true);
     try {
-      const url = `/api/ranking/general?rankingId=${selectedRanking.id}&limit=1000`;
+      const url = `/api/ranking/general?rankingId=${selectedRanking.id}&limit=${MAX_PAGE_SIZE}`;
       const res = await fetch(url);
       if (res.ok) {
         const response = await res.json();
@@ -201,7 +226,7 @@ export function GeneralRankingTable() {
   }, [selectedRanking]);
 
   useEffect(() => {
-    fetchPlayers();
+    void Promise.resolve().then(fetchPlayers);
   }, [fetchPlayers]);
 
   const handleSort = (key: string) => {
@@ -473,24 +498,6 @@ export function GeneralRankingTable() {
     });
   };
 
-  const SortableHead = ({
-    column,
-    children,
-  }: {
-    column: string;
-    children: React.ReactNode;
-  }) => (
-    <TableHead
-      className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
-      onClick={() => handleSort(column)}
-    >
-      <div className="flex items-center">
-        {children}
-        <SortIcon column={column} sortConfig={sortConfig} />
-      </div>
-    </TableHead>
-  );
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -585,17 +592,41 @@ export function GeneralRankingTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <SortableHead column="position">
+                <SortableHead
+                  column="position"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                >
                   <span className="hidden xs:inline">Pos.</span>
                   <span className="xs:hidden">#</span>
                 </SortableHead>
-                <SortableHead column="name">Giocatore</SortableHead>
-                <SortableHead column="total_points">
+                <SortableHead
+                  column="name"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                >
+                  Giocatore
+                </SortableHead>
+                <SortableHead
+                  column="total_points"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                >
                   <span className="hidden sm:inline">Punti Totali</span>
                   <span className="sm:hidden">Punti</span>
                 </SortableHead>
-                <SortableHead column="t1">T1</SortableHead>
-                <SortableHead column="presenze">
+                <SortableHead
+                  column="t1"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                >
+                  T1
+                </SortableHead>
+                <SortableHead
+                  column="presenze"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                >
                   <span className="hidden xs:inline">Presenze</span>
                   <span className="xs:hidden">Pres.</span>
                 </SortableHead>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "@/lib/constants";
 
 // ============================================================================
 // Authentication Schemas
@@ -25,13 +26,13 @@ export const paginationSchema = z.object({
   page: z
     .string()
     .optional()
-    .default("1")
+    .default(String(DEFAULT_PAGE))
     .transform((val) => Math.max(1, parseInt(val, 10))),
   limit: z
     .string()
     .optional()
-    .default("100")
-    .transform((val) => Math.min(1000, Math.max(1, parseInt(val, 10)))),
+    .default(String(DEFAULT_PAGE_SIZE))
+    .transform((val) => Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(val, 10)))),
 });
 
 export const rankingIdSchema = z.object({

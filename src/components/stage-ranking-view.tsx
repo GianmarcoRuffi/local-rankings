@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useSession } from "@/hooks/useSession";
 import { useRouter } from "next/navigation";
 import {
@@ -125,6 +125,30 @@ interface StageEditState {
   date: string;
 }
 
+function SortableHead({
+  column,
+  children,
+  sortConfig,
+  onSort,
+}: {
+  column: string;
+  children: ReactNode;
+  sortConfig: SortConfig;
+  onSort: (column: string) => void;
+}) {
+  return (
+    <TableHead
+      className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
+      onClick={() => onSort(column)}
+    >
+      <div className="flex items-center">
+        {children}
+        <SortIcon column={column} sortConfig={sortConfig} />
+      </div>
+    </TableHead>
+  );
+}
+
 export function StageRankingView() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -200,13 +224,13 @@ export function StageRankingView() {
   }, []);
 
   useEffect(() => {
-    fetchStages();
+    void Promise.resolve().then(fetchStages);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRanking]);
 
   useEffect(() => {
     if (selectedStage) {
-      fetchPlayers(selectedStage.id);
+      void Promise.resolve().then(() => fetchPlayers(selectedStage.id));
     }
   }, [selectedStage, fetchPlayers]);
 
@@ -458,24 +482,6 @@ export function StageRankingView() {
     return sortConfig.direction === "asc" ? comparison : -comparison;
   });
 
-  const SortableHead = ({
-    column,
-    children,
-  }: {
-    column: string;
-    children: React.ReactNode;
-  }) => (
-    <TableHead
-      className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
-      onClick={() => handleSort(column)}
-    >
-      <div className="flex items-center">
-        {children}
-        <SortIcon column={column} sortConfig={sortConfig} />
-      </div>
-    </TableHead>
-  );
-
   const currentSelectedStage =
     stages.find((s) => s.id === selectedStage?.id) ?? selectedStage;
   const isActive = currentSelectedStage?.status === "active";
@@ -657,17 +663,41 @@ export function StageRankingView() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableHead column="position">
+                    <SortableHead
+                      column="position"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
                       <span className="hidden xs:inline">Pos.</span>
                       <span className="xs:hidden">#</span>
                     </SortableHead>
-                    <SortableHead column="name">Giocatore</SortableHead>
-                    <SortableHead column="pointsAwarded">
+                    <SortableHead
+                      column="name"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Giocatore
+                    </SortableHead>
+                    <SortableHead
+                      column="pointsAwarded"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
                       <span className="hidden sm:inline">Punti Classifica</span>
                       <span className="sm:hidden">Punti</span>
                     </SortableHead>
-                    <SortableHead column="t1">T1</SortableHead>
-                    <SortableHead column="presenze">
+                    <SortableHead
+                      column="t1"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      T1
+                    </SortableHead>
+                    <SortableHead
+                      column="presenze"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
                       <span className="hidden xs:inline">Presenze</span>
                       <span className="xs:hidden">Pres.</span>
                     </SortableHead>

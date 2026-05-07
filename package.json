@@ -10,12 +10,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
-    "db:drop": "drizzle-kit drop",
     "db:seed": "tsx scripts/seed.ts",
-    "db:mock": "tsx scripts/mock-data.ts",
-    "db:create-user": "tsx scripts/create-user.ts"
+    "db:create-user": "tsx scripts/create-user.ts",
+    "db:create-default-ranking": "tsx scripts/create-default-ranking.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

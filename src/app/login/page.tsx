@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Script from "next/script";
-import { useRouter } from "next/navigation";
 import { Trophy } from "lucide-react";
 import {
   Card,
@@ -21,11 +20,11 @@ declare global {
     turnstile?: {
       reset: () => void;
     };
+    __NEXT_PUBLIC_TURNSTILE_SITE_KEY__?: string;
   }
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
@@ -34,7 +33,7 @@ export default function LoginPage() {
   const turnstileSiteKey =
     typeof window === "undefined"
       ? process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-      : (window as any).__NEXT_PUBLIC_TURNSTILE_SITE_KEY__ ||
+      : window.__NEXT_PUBLIC_TURNSTILE_SITE_KEY__ ||
         process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const isTurnstileConfigured = Boolean(turnstileSiteKey);
 

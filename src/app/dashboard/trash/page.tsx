@@ -11,12 +11,7 @@ import {
   RefreshCw,
   Users,
 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -63,11 +58,13 @@ export default function TrashPage() {
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
-  
+
   // Modale di conferma
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<TrashItem | null>(null);
-  const [confirmAction, setConfirmAction] = useState<"restore" | "delete" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    "restore" | "delete" | null
+  >(null);
 
   const fetchTrash = useCallback(async () => {
     setLoading(true);
@@ -75,7 +72,7 @@ export default function TrashPage() {
       const res = await fetch("/api/ranking/trash");
       if (res.ok) {
         const data = await res.json();
-        
+
         // Transform rankings
         const transformedRankings: RankingItem[] = data.rankings.map(
           (r: { id: number; name: string; deletedAt: Date }) => ({
@@ -83,32 +80,40 @@ export default function TrashPage() {
             name: r.name,
             deletedAt: r.deletedAt,
             type: "ranking" as const,
-          })
+          }),
         );
         setRankings(transformedRankings);
 
         // Transform general ranking groups
-        const transformedGroups: GeneralRankingGroup[] = data.generalRankingGroups?.map(
-          (g: { rankingId: number; rankingName: string; entryCount: number; deletedAt: Date; totalPoints: number }) => ({
-            rankingId: g.rankingId,
-            rankingName: g.rankingName,
-            entryCount: g.entryCount,
-            deletedAt: g.deletedAt,
-            totalPoints: g.totalPoints,
-            type: "generalRankingGroup" as const,
-          })
-        ) || [];
+        const transformedGroups: GeneralRankingGroup[] =
+          data.generalRankingGroups?.map(
+            (g: {
+              rankingId: number;
+              rankingName: string;
+              entryCount: number;
+              deletedAt: Date;
+              totalPoints: number;
+            }) => ({
+              rankingId: g.rankingId,
+              rankingName: g.rankingName,
+              entryCount: g.entryCount,
+              deletedAt: g.deletedAt,
+              totalPoints: g.totalPoints,
+              type: "generalRankingGroup" as const,
+            }),
+          ) || [];
         setGeneralGroups(transformedGroups);
 
         // Transform stages
-        const transformedStages: StageItem[] = data.stages?.map(
-          (s: { id: number; name: string; deletedAt: Date }) => ({
-            id: s.id,
-            name: s.name,
-            deletedAt: s.deletedAt,
-            type: "stage" as const,
-          })
-        ) || [];
+        const transformedStages: StageItem[] =
+          data.stages?.map(
+            (s: { id: number; name: string; deletedAt: Date }) => ({
+              id: s.id,
+              name: s.name,
+              deletedAt: s.deletedAt,
+              type: "stage" as const,
+            }),
+          ) || [];
         setStages(transformedStages);
       }
     } catch (error) {
@@ -138,14 +143,15 @@ export default function TrashPage() {
     } else {
       await executeDelete(itemToDelete);
     }
-    
+
     setConfirmDialogOpen(false);
     setItemToDelete(null);
     setConfirmAction(null);
   };
 
   const executeRestore = async (item: TrashItem) => {
-    const itemId = item.type === "generalRankingGroup" ? item.rankingId : item.id;
+    const itemId =
+      item.type === "generalRankingGroup" ? item.rankingId : item.id;
     setRestoring(itemId);
     try {
       let res;
@@ -199,7 +205,8 @@ export default function TrashPage() {
   };
 
   const executeDelete = async (item: TrashItem) => {
-    const itemId = item.type === "generalRankingGroup" ? item.rankingId : item.id;
+    const itemId =
+      item.type === "generalRankingGroup" ? item.rankingId : item.id;
     setDeleting(itemId);
     try {
       let res;
@@ -235,7 +242,8 @@ export default function TrashPage() {
       if (res?.ok) {
         toast({
           title: "Eliminato",
-          description: getItemName(item) + " è stato eliminato definitivamente.",
+          description:
+            getItemName(item) + " è stato eliminato definitivamente.",
           variant: "success" as Parameters<typeof toast>[0]["variant"],
         });
         await fetchTrash();
@@ -243,7 +251,8 @@ export default function TrashPage() {
         const data = await res?.json();
         toast({
           title: "Errore",
-          description: data?.error || "Errore durante l'eliminazione definitiva",
+          description:
+            data?.error || "Errore durante l'eliminazione definitiva",
           variant: "destructive",
         });
       }
@@ -281,7 +290,8 @@ export default function TrashPage() {
     );
   }
 
-  const hasItems = rankings.length > 0 || generalGroups.length > 0 || stages.length > 0;
+  const hasItems =
+    rankings.length > 0 || generalGroups.length > 0 || stages.length > 0;
 
   return (
     <div className="space-y-6">
@@ -291,7 +301,8 @@ export default function TrashPage() {
           Cestino
         </h1>
         <p className="text-muted-foreground mt-1">
-          Classifiche e dati eliminati. Puoi ripristinarli o eliminarli definitivamente.
+          Classifiche e dati eliminati. Puoi ripristinarli o eliminarli
+          definitivamente.
         </p>
       </div>
 
@@ -308,8 +319,8 @@ export default function TrashPage() {
             <Trash2 className="h-16 w-16 text-muted-foreground/30 mb-4" />
             <h3 className="text-xl font-semibold mb-2">Il cestino è vuoto</h3>
             <p className="text-muted-foreground max-w-md">
-              Le classifiche e i dati eliminati appariranno qui. Vengono conservati per 5 giorni
-              prima dell&apos;eliminazione definitiva.
+              Le classifiche e i dati eliminati appariranno qui. Vengono
+              conservati per 5 giorni prima dell&apos;eliminazione definitiva.
             </p>
           </CardContent>
         </Card>
@@ -352,7 +363,9 @@ export default function TrashPage() {
                           title="Ripristina"
                         >
                           <RotateCcw className="h-4 w-4 mr-1" />
-                          {restoring === item.id ? "Ripristino..." : "Ripristina"}
+                          {restoring === item.id
+                            ? "Ripristino..."
+                            : "Ripristina"}
                         </Button>
                         <Button
                           variant="destructive"
@@ -401,7 +414,9 @@ export default function TrashPage() {
                             <span>•</span>
                             <span>{item.totalPoints} punti totali</span>
                             <span>•</span>
-                            <span>Eliminato il {formatDate(item.deletedAt)}</span>
+                            <span>
+                              Eliminato il {formatDate(item.deletedAt)}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -414,7 +429,9 @@ export default function TrashPage() {
                           title="Ripristina tutta la classifica"
                         >
                           <RotateCcw className="h-4 w-4 mr-1" />
-                          {restoring === item.rankingId ? "Ripristino..." : "Ripristina"}
+                          {restoring === item.rankingId
+                            ? "Ripristino..."
+                            : "Ripristina"}
                         </Button>
                         <Button
                           variant="destructive"
@@ -470,7 +487,9 @@ export default function TrashPage() {
                           title="Ripristina"
                         >
                           <RotateCcw className="h-4 w-4 mr-1" />
-                          {restoring === item.id ? "Ripristino..." : "Ripristina"}
+                          {restoring === item.id
+                            ? "Ripristino..."
+                            : "Ripristina"}
                         </Button>
                         <Button
                           variant="destructive"
@@ -488,11 +507,6 @@ export default function TrashPage() {
               </CardContent>
             </Card>
           )}
-
-          <div className="text-center text-sm text-muted-foreground">
-            <AlertTriangle className="h-4 w-4 inline mr-1" />
-            I dati vengono eliminati automaticamente dopo 5 giorni
-          </div>
         </div>
       )}
 
@@ -516,17 +530,41 @@ export default function TrashPage() {
             <DialogDescription>
               {confirmAction === "delete" ? (
                 <>
-                  Stai per eliminare definitivamente <strong>&quot;{itemToDelete ? getItemName(itemToDelete) : ""}&quot;</strong>.
+                  Stai per eliminare definitivamente{" "}
+                  <strong>
+                    &quot;{itemToDelete ? getItemName(itemToDelete) : ""}&quot;
+                  </strong>
+                  .
                   {itemToDelete?.type === "generalRankingGroup" && (
-                    <> Questa azione eliminerà <strong>{(itemToDelete as GeneralRankingGroup).entryCount} giocatori</strong> in modo permanente.</>
-                  )}
-                  {" "}Questa operazione è <strong>irreversibile</strong>.
+                    <>
+                      {" "}
+                      Questa azione eliminerà{" "}
+                      <strong>
+                        {(itemToDelete as GeneralRankingGroup).entryCount}{" "}
+                        giocatori
+                      </strong>{" "}
+                      in modo permanente.
+                    </>
+                  )}{" "}
+                  Questa operazione è <strong>irreversibile</strong>.
                 </>
               ) : (
                 <>
-                  Stai per ripristinare <strong>&quot;{itemToDelete ? getItemName(itemToDelete) : ""}&quot;</strong>.
+                  Stai per ripristinare{" "}
+                  <strong>
+                    &quot;{itemToDelete ? getItemName(itemToDelete) : ""}&quot;
+                  </strong>
+                  .
                   {itemToDelete?.type === "generalRankingGroup" && (
-                    <> Verranno ripristinati <strong>{(itemToDelete as GeneralRankingGroup).entryCount} giocatori</strong>.</>
+                    <>
+                      {" "}
+                      Verranno ripristinati{" "}
+                      <strong>
+                        {(itemToDelete as GeneralRankingGroup).entryCount}{" "}
+                        giocatori
+                      </strong>
+                      .
+                    </>
                   )}
                 </>
               )}

@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { rankings, generalRanking, stages, stageRanking } from "@/lib/db/schema";
+import {
+  rankings,
+  generalRanking,
+  stages,
+  stageRanking,
+} from "@/lib/db/schema";
 import { eq, not, isNull, desc, inArray, and } from "drizzle-orm";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 const restoreRankingSchema = z.object({
   rankingId: z.number().positive(),
@@ -38,7 +44,7 @@ const deletePermanentlyStageSchema = z.object({
   stageId: z.number().positive(),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -60,7 +66,8 @@ export async function GET() {
       .orderBy(desc(generalRanking.deletedAt));
 
     // Group entries by rankingId
-    const generalRankingGroups: Record<number, typeof deletedGeneralEntries> = {};
+    const generalRankingGroups: Record<number, typeof deletedGeneralEntries> =
+      {};
     const ungroupedEntries: typeof deletedGeneralEntries = [];
 
     for (const entry of deletedGeneralEntries) {
@@ -82,11 +89,13 @@ export async function GET() {
         .select({ id: rankings.id, name: rankings.name })
         .from(rankings)
         .where(inArray(rankings.id, rankingIds));
-      rankingNames = Object.fromEntries(rankingData.map(r => [r.id, r.name]));
+      rankingNames = Object.fromEntries(rankingData.map((r) => [r.id, r.name]));
     }
 
     // Create grouped items
-    const generalRankingGroupsWithInfo = Object.entries(generalRankingGroups).map(([rankingId, entries]) => ({
+    const generalRankingGroupsWithInfo = Object.entries(
+      generalRankingGroups,
+    ).map(([rankingId, entries]) => ({
       type: "generalRankingGroup" as const,
       rankingId: Number(rankingId),
       rankingName: rankingNames[Number(rankingId)] || `Circuito #${rankingId}`,
@@ -110,10 +119,10 @@ export async function GET() {
       stages: deletedStages,
     });
   } catch (error) {
-    console.error("Error fetching trash:", error);
+    logger.error("Error fetching trash:", { error });
     return NextResponse.json(
       { error: "Failed to fetch trash" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -144,8 +153,29 @@ export async function POST(request: Request) {
         .limit(1);
 
       if (existing.length === 0 || !existing[0].deletedAt) {
-        return NextResponse.json({ error: "Ranking not found in trash" }, { status: 404 });
+        return NextResponse.json(
+          { error: "Ranking not found in trash" },
+          { status: 404 },
+        );
       }
+
+      // Count associated data before restore
+      const associatedGeneral = await db
+        .select()
+        .from(generalRanking)
+        .where(
+          and(
+            eq(generalRanking.rankingId, rankingId),
+            not(isNull(generalRanking.deletedAt)),
+          ),
+        );
+
+      const associatedStages = await db
+        .select()
+        .from(stages)
+        .where(
+          and(eq(stages.rankingId, rankingId), not(isNull(stages.deletedAt))),
+        );
 
       await db.transaction(async (tx) => {
         // Restore the ranking
@@ -166,7 +196,12 @@ export async function POST(request: Request) {
           .where(eq(stages.rankingId, rankingId));
       });
 
-      return NextResponse.json({ success: true, message: "Classifica ripristinata" });
+      return NextResponse.json({
+        success: true,
+        message: "Classifica ripristinata",
+        restoredEntries: associatedGeneral.length,
+        restoredStages: associatedStages.length,
+      });
     }
 
     if (action === "restoreGeneralEntry") {
@@ -183,7 +218,10 @@ export async function POST(request: Request) {
         .set({ deletedAt: null })
         .where(eq(generalRanking.id, entryId));
 
-      return NextResponse.json({ success: true, message: "Entry ripristinata" });
+      return NextResponse.json({
+        success: true,
+        message: "Entry ripristinata",
+      });
     }
 
     if (action === "restoreGeneralRanking") {
@@ -201,11 +239,14 @@ export async function POST(request: Request) {
         .where(
           and(
             eq(generalRanking.rankingId, rankingId),
-            not(isNull(generalRanking.deletedAt))
-          )
+            not(isNull(generalRanking.deletedAt)),
+          ),
         );
 
-      return NextResponse.json({ success: true, message: "Classifica generale ripristinata" });
+      return NextResponse.json({
+        success: true,
+        message: "Classifica generale ripristinata",
+      });
     }
 
     if (action === "deletePermanentlyRanking") {
@@ -222,8 +263,8 @@ export async function POST(request: Request) {
           .select({ id: stages.id })
           .from(stages)
           .where(eq(stages.rankingId, rankingId));
-        
-        const stageIds = rankingStages.map(s => s.id);
+
+        const stageIds = rankingStages.map((s) => s.id);
 
         if (stageIds.length > 0) {
           // Delete players from all stages of this ranking
@@ -233,9 +274,7 @@ export async function POST(request: Request) {
         }
 
         // Delete all related stages permanently
-        await tx
-          .delete(stages)
-          .where(eq(stages.rankingId, rankingId));
+        await tx.delete(stages).where(eq(stages.rankingId, rankingId));
 
         // Delete all related general ranking data permanently
         await tx
@@ -243,12 +282,13 @@ export async function POST(request: Request) {
           .where(eq(generalRanking.rankingId, rankingId));
 
         // Then delete the ranking
-        await tx
-          .delete(rankings)
-          .where(eq(rankings.id, rankingId));
+        await tx.delete(rankings).where(eq(rankings.id, rankingId));
       });
 
-      return NextResponse.json({ success: true, message: "Classifica eliminata definitivamente" });
+      return NextResponse.json({
+        success: true,
+        message: "Classifica eliminata definitivamente",
+      });
     }
 
     if (action === "deletePermanentlyGeneralEntry") {
@@ -260,11 +300,12 @@ export async function POST(request: Request) {
       const { entryId } = parsed.data;
 
       // Delete permanently
-      await db
-        .delete(generalRanking)
-        .where(eq(generalRanking.id, entryId));
+      await db.delete(generalRanking).where(eq(generalRanking.id, entryId));
 
-      return NextResponse.json({ success: true, message: "Entry eliminata definitivamente" });
+      return NextResponse.json({
+        success: true,
+        message: "Entry eliminata definitivamente",
+      });
     }
 
     if (action === "deletePermanentlyGeneralRanking") {
@@ -281,11 +322,14 @@ export async function POST(request: Request) {
         .where(
           and(
             eq(generalRanking.rankingId, rankingId),
-            not(isNull(generalRanking.deletedAt))
-          )
+            not(isNull(generalRanking.deletedAt)),
+          ),
         );
 
-      return NextResponse.json({ success: true, message: "Classifica generale eliminata definitivamente" });
+      return NextResponse.json({
+        success: true,
+        message: "Classifica generale eliminata definitivamente",
+      });
     }
 
     if (action === "restoreStage") {
@@ -302,7 +346,10 @@ export async function POST(request: Request) {
         .set({ deletedAt: null })
         .where(eq(stages.id, stageId));
 
-      return NextResponse.json({ success: true, message: "Tappa ripristinata" });
+      return NextResponse.json({
+        success: true,
+        message: "Tappa ripristinata",
+      });
     }
 
     if (action === "deletePermanentlyStage") {
@@ -315,25 +362,24 @@ export async function POST(request: Request) {
 
       await db.transaction(async (tx) => {
         // Delete all players from this stage
-        await tx
-          .delete(stageRanking)
-          .where(eq(stageRanking.stageId, stageId));
+        await tx.delete(stageRanking).where(eq(stageRanking.stageId, stageId));
 
         // Delete the stage permanently
-        await tx
-          .delete(stages)
-          .where(eq(stages.id, stageId));
+        await tx.delete(stages).where(eq(stages.id, stageId));
       });
 
-      return NextResponse.json({ success: true, message: "Tappa eliminata definitivamente" });
+      return NextResponse.json({
+        success: true,
+        message: "Tappa eliminata definitivamente",
+      });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
-    console.error("Error in trash operation:", error);
+    logger.error("Error in trash operation:", { error });
     return NextResponse.json(
       { error: "Failed to perform trash operation" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

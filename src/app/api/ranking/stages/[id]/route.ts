@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { stages, stageRanking } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { toPositiveInt } from "@/lib/utils";
 
 export async function PUT(
@@ -111,23 +111,30 @@ export async function DELETE(
   }
 
   try {
-    const stageRows = await db
+    // Check if stage exists and is not already deleted
+    const existing = await db
       .select()
       .from(stages)
-      .where(eq(stages.id, stageId))
+      .where(and(eq(stages.id, stageId), isNull(stages.deletedAt)))
       .limit(1);
 
-    if (stageRows.length === 0) {
-      return NextResponse.json({ error: "Stage not found" }, { status: 404 });
+    if (existing.length === 0) {
+      return NextResponse.json(
+        { error: "Stage not found or already deleted" },
+        { status: 404 },
+      );
     }
 
-    // Soft delete della tappa
+    // Soft delete the stage
     await db
       .update(stages)
       .set({ deletedAt: new Date() })
       .where(eq(stages.id, stageId));
 
-    return NextResponse.json({ success: true, message: "Tappa spostata nel cestino" });
+    return NextResponse.json({
+      success: true,
+      message: "Tappa spostata nel cestino",
+    });
   } catch (error) {
     logger.error("Error deleting stage:", { error });
     return NextResponse.json(

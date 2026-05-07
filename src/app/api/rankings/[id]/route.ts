@@ -145,45 +145,6 @@ export async function DELETE(
       );
     }
 
-    // Check for active (non-deleted) data in the circuit if the user is trying to delete it
-    // Actually, we want to allow cascading soft delete, so we can comment or remove this block
-    // based on the requirement to allow easy trash movement.
-    // The review suggests that the block below prevents cascading soft-delete from ever executing.
-    
-    /* 
-    const activeGeneralEntries = await db
-      .select()
-      .from(generalRanking)
-      .where(
-        and(
-          eq(generalRanking.rankingId, rankingId),
-          isNull(generalRanking.deletedAt)
-        )
-      )
-      .limit(1);
-
-    const activeStages = await db
-      .select()
-      .from(stages)
-      .where(
-        and(
-          eq(stages.rankingId, rankingId),
-          isNull(stages.deletedAt)
-        )
-      )
-      .limit(1);
-
-    if (activeGeneralEntries.length > 0 || activeStages.length > 0) {
-      return NextResponse.json(
-        { 
-          error: "Non è possibile cancellare un circuito contenente dei dati. Rimuovi prima tutte le tappe e i dati della classifica generale.",
-          hasActiveData: true,
-        },
-        { status: 400 }
-      );
-    }
-    */
-
     // Perform soft delete on the ranking and its related data in a transaction
     await db.transaction(async (tx) => {
       // Soft delete the ranking
@@ -199,20 +160,15 @@ export async function DELETE(
         .where(
           and(
             eq(generalRanking.rankingId, rankingId),
-            isNull(generalRanking.deletedAt)
-          )
+            isNull(generalRanking.deletedAt),
+          ),
         );
 
       // Soft delete any associated stages
       await tx
         .update(stages)
         .set({ deletedAt: new Date() })
-        .where(
-          and(
-            eq(stages.rankingId, rankingId),
-            isNull(stages.deletedAt)
-          )
-        );
+        .where(and(eq(stages.rankingId, rankingId), isNull(stages.deletedAt)));
     });
 
     return NextResponse.json({

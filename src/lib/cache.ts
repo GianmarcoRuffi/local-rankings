@@ -23,7 +23,10 @@ export type GeneralRankingRow = {
 
 /**
  * Fetches the general ranking from the database with caching
+ * TODO: Fix cache key to support dynamic rankingId parameter
+ * Temporarily disabled due to unstable_cache key limitations
  */
+/*
 export const getCachedGeneralRanking = unstable_cache(
   async (rankingId: number | null) => {
     const query = db.select().from(generalRanking);
@@ -59,12 +62,13 @@ export const getCachedGeneralRanking = unstable_cache(
 
     return ranked;
   },
-  ["general-ranking"],
+  (rankingId) => [`general-ranking-${rankingId ?? "all"}`],
   {
     revalidate: GENERAL_RANKING_CACHE_DURATION,
     tags: ["general-ranking"],
   },
 );
+*/
 
 /**
  * In-memory cache fallback (for environments where unstable_cache doesn't work)

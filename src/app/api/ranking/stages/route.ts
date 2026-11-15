@@ -46,13 +46,13 @@ export async function GET(request: Request) {
     if (rankingId) {
       // WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))
       query = query.where(
-        or(
+        and(isNull(stages.deletedAt), or(
           eq(stages.rankingId, rankingId),
           and(
             isNull(stages.rankingId),
             sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
           ),
-        ),
+        )),
       );
     }
 

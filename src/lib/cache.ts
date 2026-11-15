@@ -69,7 +69,7 @@ export async function getCachedGeneralRanking(
         updated_at: row.updatedAt.toISOString(),
       }));
     },
-    GENERAL_RANKING_CACHE_TTL_SECONDS,
+    0,
   );
 }
 
@@ -83,6 +83,7 @@ export async function getCachedData<T>(
   fetchFn: () => Promise<T>,
   ttlSeconds: number = GENERAL_RANKING_CACHE_TTL_SECONDS,
 ): Promise<T> {
+  if (ttlSeconds <= 0) return fetchFn();
   const now = Date.now();
   const cached = memoryCache.get(key);
 

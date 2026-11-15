@@ -15,8 +15,6 @@ import {
   Download,
   FileText,
 } from "lucide-react";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import {
   Table,
   TableBody,
@@ -387,9 +385,11 @@ export function GeneralRankingTable() {
     URL.revokeObjectURL(url);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     if (sortedPlayers.length === 0) return;
 
+    const { jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
     const doc = new jsPDF("p", "mm", "a4");
 
     // Title

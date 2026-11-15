@@ -15,12 +15,10 @@ export async function createSession(userId: number): Promise<string> {
   const token = generateSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-  await db.delete(sessions).where(eq(sessions.userId, userId));
-
-  await db.insert(sessions).values({
-    userId,
-    token,
-    expiresAt,
+  await db.transaction(async (tx) => {
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+    await tx.delete(sessions).where(eq(sessions.userId, userId));
+    await tx.insert(sessions).values({ userId, token, expiresAt });
   });
 
   return token;

@@ -77,13 +77,20 @@ export async function POST(request: NextRequest) {
       .orderBy(stageRanking.position);
 
     await db.transaction(async (tx) => {
+        // Serialize ranking mutations, then recheck the stage under its row lock.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(${rankingId ?? 0})`);
+        const [lockedStage] = await tx.select().from(stages)
+          .where(and(eq(stages.id, stageId), isNull(stages.deletedAt))).for("update");
+        if (!lockedStage || lockedStage.status !== "merged") throw new Error("Stage state changed; reload before retrying");
+
       for (const player of stagePlayers) {
         const existing = await tx
           .select()
           .from(generalRanking)
           .where(
             and(
-              sql`LOWER(${generalRanking.name}) = LOWER(${player.name})`,
+              isNull(generalRanking.deletedAt),
+                sql`LOWER(${generalRanking.name}) = LOWER(${player.name})`,
               or(
                 eq(generalRanking.rankingId, rankingId!),
                 and(
@@ -169,7 +176,7 @@ export async function POST(request: NextRequest) {
     logger.error("Error reverting merge:", { error });
     return NextResponse.json(
       { error: "Failed to revert merge" },
-      { status: 500 },
+      { status: error instanceof Error && error.message.startsWith("Stage state changed") ? 409 : 500 },
     );
   }
 }

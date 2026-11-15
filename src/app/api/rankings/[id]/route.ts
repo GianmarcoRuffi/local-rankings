@@ -145,18 +145,19 @@ export async function DELETE(
       );
     }
 
+    const deletionGroup = crypto.randomUUID();
     // Perform soft delete on the ranking and its related data in a transaction
     await db.transaction(async (tx) => {
       // Soft delete the ranking
       await tx
         .update(rankings)
-        .set({ deletedAt: new Date() })
+        .set({ deletedAt: new Date(), deletionGroup })
         .where(eq(rankings.id, rankingId));
 
       // Soft delete any associated general ranking data
       await tx
         .update(generalRanking)
-        .set({ deletedAt: new Date() })
+        .set({ deletedAt: new Date(), deletionGroup })
         .where(
           and(
             eq(generalRanking.rankingId, rankingId),
@@ -167,7 +168,7 @@ export async function DELETE(
       // Soft delete any associated stages
       await tx
         .update(stages)
-        .set({ deletedAt: new Date() })
+        .set({ deletedAt: new Date(), deletionGroup })
         .where(and(eq(stages.rankingId, rankingId), isNull(stages.deletedAt)));
     });
 

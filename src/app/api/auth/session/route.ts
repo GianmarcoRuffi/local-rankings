@@ -1,3 +1,4 @@
+import { validateSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySessionJWT } from "@/lib/jwt";
@@ -13,7 +14,7 @@ export async function GET() {
 
     const payload = await verifySessionJWT(sessionToken.value);
 
-    if (!payload) {
+    if (!payload || !(await validateSession(payload.jti)).valid) {
       return NextResponse.json({ session: null }, { status: 200 });
     }
 

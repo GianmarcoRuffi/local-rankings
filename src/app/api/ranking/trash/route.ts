@@ -180,19 +180,19 @@ export async function POST(request: NextRequest) {
         // Restore the ranking
         await tx
           .update(rankings)
-          .set({ deletedAt: null })
+          .set({ deletedAt: null, deletionGroup: null })
           .where(eq(rankings.id, rankingId));
 
         // Also restore any associated data
-        await tx
+        if (existing[0].deletionGroup) await tx
           .update(generalRanking)
-          .set({ deletedAt: null })
-          .where(eq(generalRanking.rankingId, rankingId));
+          .set({ deletedAt: null, deletionGroup: null })
+          .where(and(eq(generalRanking.rankingId, rankingId), eq(generalRanking.deletionGroup, existing[0].deletionGroup!)));
 
-        await tx
+        if (existing[0].deletionGroup) await tx
           .update(stages)
-          .set({ deletedAt: null })
-          .where(eq(stages.rankingId, rankingId));
+          .set({ deletedAt: null, deletionGroup: null })
+          .where(and(eq(stages.rankingId, rankingId), eq(stages.deletionGroup, existing[0].deletionGroup!)));
       });
 
       return NextResponse.json({

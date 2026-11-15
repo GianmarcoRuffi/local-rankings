@@ -14,7 +14,7 @@ Sistema gestionale per l'organizzazione e il calcolo delle classifiche di tornei
 ## Setup e Configurazione
 
 ### Prerequisiti
-- Node.js 18.x o superiore
+- Node.js 22.x e npm 10.x
 - PostgreSQL (istanza locale o cloud come Neon, Vercel Postgres, Supabase)
 
 ### Installazione
@@ -80,3 +80,24 @@ npm run build
 
 ---
 **Sviluppato da Gianmarco Ruffi**
+
+## Verifiche automatiche
+
+```bash
+npm ci
+npm test
+npx playwright install chromium
+npm run test:integration
+npm run lint
+npm run build
+```
+
+La suite di integrazione avvia PostgreSQL temporaneo su porta 55439 e Next su
+3181, applica tutte le migrazioni e usa solo dati sintetici. Richiede queste porte
+libere; le credenziali del progetto non vengono usate per il database dei test.
+Gli screenshot desktop/mobile sono salvati in `/tmp/local-rankings-screenshots`.
+
+La migrazione `0004_deletion_groups` va applicata prima di avviare questa versione
+sul database reale. Il ripristino conserva le eliminazioni antecedenti a quella
+della classifica. Per i dati storici senza gruppo, recuperare i figli individualmente.
+Le sessioni JWT precedenti a questa versione richiedono un nuovo login.

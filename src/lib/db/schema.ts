@@ -44,6 +44,7 @@ export const rankings = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
     deletedAt: timestamp("deleted_at"),
+    deletionGroup: varchar("deletion_group", { length: 36 }),
   },
   (table) => [
     index("idx_is_default").on(table.isDefault),
@@ -71,6 +72,7 @@ export const stages = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
     deletedAt: timestamp("deleted_at"),
+    deletionGroup: varchar("deletion_group", { length: 36 }),
   },
   (table) => [
     index("idx_status").on(table.status),
@@ -121,6 +123,7 @@ export const generalRanking = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
     deletedAt: timestamp("deleted_at"),
+    deletionGroup: varchar("deletion_group", { length: 36 }),
   },
   (table) => [
     index("idx_total_points").on(table.totalPoints),

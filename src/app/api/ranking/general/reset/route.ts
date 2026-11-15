@@ -1,3 +1,4 @@
+import { toPositiveInt } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const rankingIdStr = searchParams.get("rankingId");
-    const rankingId = rankingIdStr ? Number.parseInt(rankingIdStr, 10) : null;
+    const rankingId = rankingIdStr ? toPositiveInt(rankingIdStr) : null;
 
     if (
       rankingIdStr &&

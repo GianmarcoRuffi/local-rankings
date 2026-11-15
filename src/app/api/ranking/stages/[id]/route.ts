@@ -79,6 +79,9 @@ export async function GET(
   }
 
   try {
+    const [stage] = await db.select({ id: stages.id }).from(stages)
+      .where(and(eq(stages.id, stageId), isNull(stages.deletedAt))).limit(1);
+    if (!stage) return NextResponse.json({ error: "Stage not found" }, { status: 404 });
     const players = await db
       .select()
       .from(stageRanking)

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/require-auth";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, sessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { BCRYPT_ROUNDS } from "@/lib/constants";
 import { logger } from "@/lib/logger";
@@ -66,10 +66,10 @@ export async function POST(request: NextRequest) {
     }
 
     const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-    await db
-      .update(users)
-      .set({ passwordHash: newHash, updatedAt: new Date() })
-      .where(eq(users.id, user.id));
+    await db.transaction(async (tx) => {
+      await tx.update(users).set({ passwordHash: newHash, updatedAt: new Date() }).where(eq(users.id, user.id));
+      await tx.delete(sessions).where(eq(sessions.userId, user.id));
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

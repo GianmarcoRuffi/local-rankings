@@ -1,3 +1,4 @@
+import { validateSession } from "@/lib/session";
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionJWT } from "@/lib/jwt";
 
@@ -24,7 +25,7 @@ export async function requireAuth(request: NextRequest): Promise<
 
   const session = await verifySessionJWT(sessionToken);
 
-  if (!session) {
+  if (!session || !(await validateSession(session.jti)).valid) {
     return {
       authorized: false,
       response: NextResponse.json(

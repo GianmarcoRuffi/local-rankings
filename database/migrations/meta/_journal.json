@@ -19,8 +19,22 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1778141725922,
-      "tag": "0002_graceful_psynapse",
+      "when": 1778140997135,
+      "tag": "0002_volatile_scream",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778148472852,
+      "tag": "0003_new_domino",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794769407492,
+      "tag": "0004_deletion_groups",
       "breakpoints": true
     }
   ]

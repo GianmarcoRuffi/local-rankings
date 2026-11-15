@@ -77,6 +77,8 @@ export default function LoginPage() {
       } else {
         setRedirecting(true);
         // Forza reload completo per assicurare che il cookie venga letto
+        // Reload initializes the authenticated server navbar and shared session provider.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = "/dashboard";
         return;
       }

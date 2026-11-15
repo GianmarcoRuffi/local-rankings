@@ -1,3 +1,4 @@
+import { validateSession } from "@/lib/session";
 import { cookies } from "next/headers";
 import { Navbar } from "@/components/navbar";
 import { verifySessionJWT } from "@/lib/jwt";
@@ -13,7 +14,7 @@ async function getUserFromSession() {
 
     const payload = await verifySessionJWT(sessionToken.value);
 
-    if (!payload) {
+    if (!payload || !(await validateSession(payload.jti)).valid) {
       return null;
     }
 

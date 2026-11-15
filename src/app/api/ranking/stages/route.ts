@@ -38,18 +38,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Invalid rankingId" }, { status: 400 });
     }
 
-    const query = db.select().from(stages);
+    let query = db.select().from(stages).$dynamic();
+
+    // Exclude soft-deleted entries
+    query = query.where(isNull(stages.deletedAt));
 
     if (rankingId) {
       // WHERE ranking_id = ? OR (ranking_id IS NULL AND ? = (SELECT id FROM rankings WHERE is_default = 1 LIMIT 1))
-      query.where(
-        or(
+      query = query.where(
+        and(isNull(stages.deletedAt), or(
           eq(stages.rankingId, rankingId),
           and(
             isNull(stages.rankingId),
             sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
           ),
-        ),
+        )),
       );
     }
 

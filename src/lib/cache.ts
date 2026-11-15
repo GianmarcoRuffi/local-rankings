@@ -33,15 +33,21 @@ export async function getCachedGeneralRanking(
             .select()
             .from(generalRanking)
             .where(
-              or(
-                eq(generalRanking.rankingId, rankingId),
-                and(
-                  isNull(generalRanking.rankingId),
-                  sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+              and(
+                isNull(generalRanking.deletedAt),
+                or(
+                  eq(generalRanking.rankingId, rankingId),
+                  and(
+                    isNull(generalRanking.rankingId),
+                    sql`${rankingId} = (SELECT id FROM rankings WHERE is_default = true LIMIT 1)`,
+                  ),
                 ),
               ),
             )
-        : await db.select().from(generalRanking);
+        : await db
+            .select()
+            .from(generalRanking)
+            .where(isNull(generalRanking.deletedAt));
 
       const sorted = sortRanking(
         rows.map((row) => ({
@@ -63,7 +69,7 @@ export async function getCachedGeneralRanking(
         updated_at: row.updatedAt.toISOString(),
       }));
     },
-    GENERAL_RANKING_CACHE_TTL_SECONDS,
+    0,
   );
 }
 
@@ -77,6 +83,7 @@ export async function getCachedData<T>(
   fetchFn: () => Promise<T>,
   ttlSeconds: number = GENERAL_RANKING_CACHE_TTL_SECONDS,
 ): Promise<T> {
+  if (ttlSeconds <= 0) return fetchFn();
   const now = Date.now();
   const cached = memoryCache.get(key);
 

@@ -68,7 +68,7 @@ function getRateLimitConfig(
   pathname: string,
   method: string,
 ): RateLimitConfig | null {
-  if (pathname.startsWith("/api/auth/")) {
+  if (pathname.startsWith("/api/auth/") && pathname !== "/api/auth/session") {
     return RATE_LIMITS.AUTH;
   }
 

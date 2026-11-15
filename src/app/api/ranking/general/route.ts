@@ -7,7 +7,6 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Valida i parametri query
     const validation = generalRankingQuerySchema.safeParse({
       rankingId: searchParams.get("rankingId") ?? undefined,
       page: searchParams.get("page") ?? undefined,
@@ -26,7 +25,6 @@ export async function GET(request: Request) {
     const offset = (page - 1) * limit;
 
     const ranked = await getCachedGeneralRanking(rankingId);
-
     const total = ranked.length;
     const paginatedRanked = ranked.slice(offset, offset + limit);
 

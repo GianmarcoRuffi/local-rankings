@@ -22,31 +22,17 @@ export const changePasswordSchema = z.object({
 // Query Parameters Schemas
 // ============================================================================
 
+const positiveIntegerParam = z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(z.number().int().positive().max(Number.MAX_SAFE_INTEGER));
+
 export const paginationSchema = z.object({
-  page: z
-    .string()
-    .optional()
-    .default(String(DEFAULT_PAGE))
-    .transform((val) => Math.max(1, parseInt(val, 10))),
-  limit: z
-    .string()
-    .optional()
-    .default(String(DEFAULT_PAGE_SIZE))
-    .transform((val) => Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(val, 10)))),
+  page: positiveIntegerParam.optional().default(DEFAULT_PAGE),
+  limit: positiveIntegerParam.pipe(z.number().max(MAX_PAGE_SIZE)).optional().default(DEFAULT_PAGE_SIZE),
 });
-
 export const rankingIdSchema = z.object({
-  rankingId: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val, 10) : null)),
+  rankingId: positiveIntegerParam.optional().transform((value) => value ?? null),
 });
-
 export const generalRankingQuerySchema = paginationSchema.and(rankingIdSchema);
-
-export const idParamSchema = z.object({
-  id: z.string().transform((val) => parseInt(val, 10)),
-});
+export const idParamSchema = z.object({ id: positiveIntegerParam });
 
 // ============================================================================
 // Ranking & Stage Schemas

@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid rankingId" }, { status: 400 });
     }
 
-    if (!file) {
+    if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
@@ -63,6 +63,9 @@ export async function POST(request: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    if (buffer.subarray(0, 5).toString() !== "%PDF-") {
+      return NextResponse.json({ error: "Invalid PDF content" }, { status: 400 });
+    }
 
     // Parse PDF per estrarre il testo
     const fullText = await new Promise<string>((resolve, reject) => {
@@ -188,7 +191,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Errore durante l'elaborazione del PDF",
-        details: error instanceof Error ? error.message : String(error),
+
       },
       { status: 500 },
     );

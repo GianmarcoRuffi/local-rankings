@@ -116,10 +116,12 @@ export async function POST(request: NextRequest) {
     await clearAttempts(username);
 
     // Crea JWT per il middleware (Edge Runtime compatible)
+    const sessionId = await createSession(user.id);
     const jwt = await createSessionJWT(
       user.id,
       user.username,
       user.displayName,
+      sessionId,
     );
 
     logger.info("JWT created successfully", {
@@ -127,14 +129,6 @@ export async function POST(request: NextRequest) {
       username: user.username,
       tokenLength: jwt.length,
     });
-
-    // Salva anche nel database per tracking (opzionale)
-    try {
-      await createSession(user.id);
-    } catch (dbError) {
-      logger.error("Failed to save session to database", { dbError });
-      // Non bloccare il login se il database fallisce
-    }
 
     const response = NextResponse.json({
       success: true,

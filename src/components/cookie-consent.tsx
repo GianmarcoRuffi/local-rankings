@@ -1,20 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 
+function subscribe(listener: () => void) {
+  window.addEventListener("storage", listener);
+  return () => window.removeEventListener("storage", listener);
+}
+function getSnapshot() {
+  try { return !localStorage.getItem("cookieConsent"); } catch { return false; }
+}
+
 export function CookieConsent() {
-  const [isVisible, setIsVisible] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return !localStorage.getItem("cookieConsent");
-  });
-
+  const isVisible = useSyncExternalStore(subscribe, getSnapshot, () => false);
   const handleAccept = () => {
-    localStorage.setItem("cookieConsent", "true");
-    setIsVisible(false);
+    try { localStorage.setItem("cookieConsent", "true"); } catch { return; }
+    window.dispatchEvent(new Event("storage"));
   };
 
   if (!isVisible) return null;

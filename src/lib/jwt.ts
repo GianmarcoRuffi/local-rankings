@@ -13,6 +13,7 @@ const getJWTSecret = () => {
 };
 
 export interface SessionPayload {
+  jti: string;
   userId: number;
   username: string;
   displayName: string;
@@ -24,6 +25,7 @@ export async function createSessionJWT(
   userId: number,
   username: string,
   displayName: string,
+  sessionId: string,
 ): Promise<string> {
   const token = await new SignJWT({
     userId,
@@ -31,6 +33,7 @@ export async function createSessionJWT(
     displayName,
   })
     .setProtectedHeader({ alg: "HS256" })
+    .setJti(sessionId)
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
     .sign(getJWTSecret());
@@ -46,6 +49,7 @@ export async function verifySessionJWT(
     const payload = verified.payload;
 
     if (
+      typeof payload.jti === "string" &&
       typeof payload.userId === "number" &&
       typeof payload.username === "string" &&
       typeof payload.displayName === "string" &&

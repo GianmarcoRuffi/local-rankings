@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { rankings, generalRanking, stages } from "@/lib/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { toPositiveInt } from "@/lib/utils";
 
@@ -145,25 +145,36 @@ export async function DELETE(
       );
     }
 
+    const deletionGroup = crypto.randomUUID();
+    // Perform soft delete on the ranking and its related data in a transaction
     await db.transaction(async (tx) => {
-      // Delete all general ranking entries for this ranking
+      // Soft delete the ranking
       await tx
-        .delete(generalRanking)
-        .where(eq(generalRanking.rankingId, rankingId));
+        .update(rankings)
+        .set({ deletedAt: new Date(), deletionGroup })
+        .where(eq(rankings.id, rankingId));
 
-      // Set ranking_id to NULL for stages linked to this ranking
+      // Soft delete any associated general ranking data
+      await tx
+        .update(generalRanking)
+        .set({ deletedAt: new Date(), deletionGroup })
+        .where(
+          and(
+            eq(generalRanking.rankingId, rankingId),
+            isNull(generalRanking.deletedAt),
+          ),
+        );
+
+      // Soft delete any associated stages
       await tx
         .update(stages)
-        .set({ rankingId: null })
-        .where(eq(stages.rankingId, rankingId));
-
-      // Delete the ranking
-      await tx.delete(rankings).where(eq(rankings.id, rankingId));
+        .set({ deletedAt: new Date(), deletionGroup })
+        .where(and(eq(stages.rankingId, rankingId), isNull(stages.deletedAt)));
     });
 
     return NextResponse.json({
       success: true,
-      message: "Ranking deleted successfully",
+      message: "Ranking spostato nel cestino",
     });
   } catch (error) {
     logger.error("Error deleting ranking:", { error });

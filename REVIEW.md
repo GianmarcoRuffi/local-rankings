@@ -41,3 +41,22 @@ applicati i downgrade incompatibili proposti automaticamente per Drizzle/ESLint.
 - I controlli di data e payload non sono ancora uniformi su tutte le API.
 - Applicare la migrazione 0004 prima del rilascio. Gli utenti dovranno accedere
   nuovamente. Nessuna migrazione sul database reale e nessun deploy eseguiti.
+
+## Migrazione e deploy — 15 novembre 2026
+
+Applicate sul database Neon configurato in produzione le migrazioni 0002, 0003
+e 0004 in una transazione. Registrate 0000 e 0001 come baseline dopo la verifica
+delle colonne e degli indici esistenti; il journal era vuoto. Verificati i campi
+del cestino e cinque registrazioni nel journal. Conteggi invariati: 4 utenti,
+1 classifica, 13 tappe, 52 voci generali e 313 risultati.
+
+Aggiornata DATABASE_URL dell'ambiente Preview Vercel, sostituendo il riferimento
+Aiven non più risolvibile con il database Neon configurato in produzione.
+Preview e produzione condividono quindi questo database: le scritture
+nell'anteprima agiscono sugli stessi dati.
+
+Deploy di anteprima completato con build remota:
+https://local-rankings-7tm9yd1en-gianmarcoruffis-projects.vercel.app
+L'anteprima è protetta dall'autenticazione Vercel. Nessuna promozione del codice
+in produzione effettuata. Verificati lo stato del deploy e le query SQL di
+lettura; nessuna richiesta HTTP all'anteprima eseguita.

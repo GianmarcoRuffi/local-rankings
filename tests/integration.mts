@@ -84,7 +84,14 @@ try {
  await select(empty);await switchPage.getByText('Nessuna tappa per questa classifica',{exact:true}).waitFor();assert.equal(await switchPage.getByText('Beta Player',{exact:true}).count(),0);
  await switchPage.route('**/api/ranking/stages?rankingId='+alpha,async route=>{await new Promise(r=>setTimeout(r,1200));await route.continue();});
  await select(alpha);await select(beta);await switchPage.getByText('Beta Player',{exact:true}).waitFor();await switchPage.waitForTimeout(1600);assert.equal(await switchPage.getByText('Alpha Player',{exact:true}).count(),0);
- for(const width of [320,390,768,1440,1600]){await switchPage.setViewportSize({width,height:900});assert.ok(await switchPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'authenticated overflow '+width);await switchPage.screenshot({path:'/tmp/local-rankings-screenshots/switch-'+width+'.png',fullPage:true});}
+ for(const width of [320,390,768,1280,1295,1440,1600]){await switchPage.setViewportSize({width,height:900});assert.ok(await switchPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'authenticated overflow '+width);
+ const navbarLayout = await switchPage.locator('nav').evaluate(nav => {
+   const controls = Array.from(nav.querySelectorAll('button')).filter(button => button.getBoundingClientRect().width > 0);
+   const centers = controls.map(button => {const rect=button.getBoundingClientRect();return rect.y+rect.height/2;});
+   return {aligned:Math.max(...centers)-Math.min(...centers)<2};
+ });
+ assert.ok(navbarLayout.aligned, 'navbar controls share one row at '+width);
+await switchPage.screenshot({path:'/tmp/local-rankings-screenshots/switch-'+width+'.png',fullPage:true});}
  assert.deepEqual(switchErrors,[]);await switchContext.close();console.log('PASS authenticated switching, empty circuit, delayed responses and five responsive widths');
  for(const width of [390,1440]){
   const page: Page=await browser.newPage({viewport:{width,height:900}});const errors:string[]=[]; page.on('pageerror',e=>errors.push(e.message)); page.on('console',m=>{if(m.type()==='error')console.log('browser:',m.text().slice(0,300))}); page.on('response',r=>{if(r.status()>=400 || r.url().includes('/api/rankings'))console.log('HTTP',r.status(),new URL(r.url()).pathname)}); page.on('requestfailed',r=>console.log('requestfailed',new URL(r.url()).pathname,r.failure()?.errorText));

@@ -232,7 +232,7 @@ export function RankingSelector({
         >
           <SelectTrigger
             className={cn(
-              "w-[110px] xs:w-[140px] sm:w-[220px] cursor-pointer",
+              "h-9 w-[150px] xl:w-[180px] 2xl:w-[220px] shrink-0 cursor-pointer",
               className?.includes("flex-1") && "w-full",
             )}
           >
@@ -270,7 +270,7 @@ export function RankingSelector({
                   setCreateDialogOpen(true);
                 }}
                 title="Crea nuova classifica"
-                className="h-10 w-10"
+                className="h-9 w-9"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -282,7 +282,7 @@ export function RankingSelector({
                     size="icon"
                     onClick={handleCopyShareLink}
                     title="Copia link della classifica"
-                    className="h-10 w-10"
+                    className="h-9 w-9"
                   >
                     <Share2 className="h-4 w-4" />
                   </Button>
@@ -291,7 +291,7 @@ export function RankingSelector({
                     size="icon"
                     onClick={() => openEditDialog(selectedRanking)}
                     title="Modifica classifica"
-                    className="h-10 w-10"
+                    className="h-9 w-9"
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -299,7 +299,7 @@ export function RankingSelector({
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-10 w-10 border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
+                      className="h-9 w-9 border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
                       onClick={() => openDeleteDialog(selectedRanking)}
                       title="Elimina classifica"
                     >
@@ -317,7 +317,7 @@ export function RankingSelector({
                 size="icon"
                 onClick={() => setCreateDialogOpen(true)}
                 title="Crea nuova"
-                className="h-10 w-10"
+                className="h-9 w-9"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -328,7 +328,7 @@ export function RankingSelector({
                     variant="ghost"
                     size="icon"
                     onClick={handleCopyShareLink}
-                    className="h-10 w-10"
+                    className="h-9 w-9"
                     title="Condividi"
                   >
                     <Share2 className="h-4 w-4" />
@@ -337,7 +337,7 @@ export function RankingSelector({
                     variant="ghost"
                     size="icon"
                     onClick={() => openEditDialog(selectedRanking)}
-                    className="h-10 w-10"
+                    className="h-9 w-9"
                     title="Modifica"
                   >
                     <Pencil className="h-4 w-4" />

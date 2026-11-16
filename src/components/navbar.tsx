@@ -83,18 +83,18 @@ export function Navbar({ user }: NavbarProps) {
         isScrolled ? "shadow-md" : "shadow-sm",
       )}
     >
-      <div className="container mx-auto px-4 max-w-7xl">
+      <div className="w-full overflow-x-auto px-4">
         {/* Main Header Row: Logo, Ranking Selector, User Actions */}
         <div
           className={cn(
-            "flex flex-wrap items-center justify-between gap-2 py-2 transition-all duration-300",
+            "flex w-max min-w-full flex-nowrap items-center justify-between gap-2 py-2 transition-all duration-300",
             isScrolled ? "min-h-14" : "min-h-16",
           )}
         >
           {/* Logo Section */}
           <Link
             href="/dashboard"
-            className="flex flex-wrap max-w-full items-center gap-1 sm:gap-2"
+            className="flex shrink-0 flex-nowrap items-center gap-1 sm:gap-2"
           >
             <Trophy
               className={cn(
@@ -113,7 +113,7 @@ export function Navbar({ user }: NavbarProps) {
           </Link>
 
           {/* Nav Items (Desktop only) */}
-          <div className="hidden min-[1500px]:flex items-center gap-1 mx-2">
+          <div className="flex shrink-0 items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive =
@@ -127,7 +127,7 @@ export function Navbar({ user }: NavbarProps) {
                     size="sm"
                     className={cn(
                       "gap-2 transition-all duration-300",
-                      isScrolled ? "h-8 px-2 text-xs" : "h-9 px-3",
+                      "h-9 px-2 text-xs",
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -141,16 +141,16 @@ export function Navbar({ user }: NavbarProps) {
           {/* Right Section: Selector + User Actions */}
           <div
             className={cn(
-              "flex flex-wrap max-w-full items-center gap-1 sm:gap-2",
+              "flex shrink-0 flex-nowrap items-center gap-1 sm:gap-2",
               !user && "flex-1 justify-end",
             )}
           >
-            <RankingSelector className={cn(!user && "flex-1")} />
+            <RankingSelector className="flex-nowrap! shrink-0" />
 
             <div className="flex items-center gap-1 border-l border-border ml-1 pl-1 sm:pl-2">
               {user ? (
                 <>
-                  <div className="hidden lg:flex items-center gap-2 mr-2 text-sm text-muted-foreground max-w-[120px]">
+                  <div className="hidden min-[1400px]:flex items-center gap-2 mr-1 text-sm text-muted-foreground max-w-[90px]">
                     <User className="h-4 w-4 shrink-0" />
                     <span className="truncate">{user.name || user.email}</span>
                   </div>
@@ -158,22 +158,22 @@ export function Navbar({ user }: NavbarProps) {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-10 w-10 sm:h-10 sm:w-auto sm:px-3 transition-all duration-300"
+                      className="h-9 w-9 min-[1400px]:w-auto min-[1400px]:px-3 transition-all duration-300"
                       title="Password"
                     >
                       <KeyRound className="h-4 w-4" />
-                      <span className="hidden sm:inline ml-2">Password</span>
+                      <span className="hidden min-[1400px]:inline ml-2">Password</span>
                     </Button>
                   </Link>
                   <Button
                     variant="destructive"
                     size="icon"
                     onClick={handleLogout}
-                    className="h-10 w-10 sm:h-10 sm:w-auto sm:px-3 transition-all duration-300 font-semibold"
+                    className="h-9 w-9 min-[1400px]:w-auto min-[1400px]:px-3 transition-all duration-300 font-semibold"
                     title="Esci"
                   >
                     <LogOut className="h-4 w-4" />
-                    <span className="hidden sm:inline ml-2">Esci</span>
+                    <span className="hidden min-[1400px]:inline ml-2">Esci</span>
                   </Button>
                 </>
               ) : (
@@ -181,54 +181,18 @@ export function Navbar({ user }: NavbarProps) {
                   variant="default"
                   size="icon"
                   onClick={handleLogin}
-                  className="h-10 w-10 sm:h-10 sm:w-auto sm:px-3 transition-all duration-300"
+                  className="h-9 w-9 min-[1400px]:w-auto min-[1400px]:px-3 transition-all duration-300"
                   title="Accedi"
                 >
                   <LogIn className="h-4 w-4" />
-                  <span className="hidden sm:inline ml-2">Accedi</span>
+                  <span className="hidden min-[1400px]:inline ml-2">Accedi</span>
                 </Button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Navigation Tabs Row (Mobile/Tablet only) */}
-        <div className="min-[1500px]:hidden border-t py-2">
-          <div className="flex items-center gap-4">
-            {user && (
-              <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground shrink-0 border-r pr-3">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="max-w-[70px] truncate">
-                  {user.name?.split(" ")[0] || "Utente"}
-                </span>
-              </div>
-            )}
-            <div className="flex min-w-0 gap-1 overflow-x-auto scrollbar-hide flex-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  item.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname.startsWith(item.href);
-                return (
-                  <Link key={item.href} href={item.href} className="shrink-0">
-                    <Button
-                      variant={isActive ? "secondary" : "ghost"}
-                      size="sm"
-                      className={cn(
-                        "gap-2 whitespace-nowrap h-8 px-3 text-xs",
-                        isActive && "bg-secondary text-secondary-foreground",
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+
       </div>
     </nav>
   );

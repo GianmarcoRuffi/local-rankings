@@ -183,6 +183,11 @@ function SortableHead({
 }
 
 export function GeneralRankingTable() {
+  const { selectedRanking } = useRanking();
+  return <GeneralRankingContent key={selectedRanking?.id ?? "empty"} />;
+}
+
+function GeneralRankingContent() {
   const { data: session } = useSession();
   const isAuthenticated = !!session;
   const { selectedRanking } = useRanking();

@@ -74,6 +74,19 @@ export function RankingProvider({ children }: { children: ReactNode }) {
     void Promise.resolve().then(fetchRankings);
   }, [fetchRankings]);
 
+  useEffect(() => {
+    const syncSelection = () => {
+      const id = new URLSearchParams(window.location.search).get("rankingId") || localStorage.getItem("selectedRankingId");
+      const found = rankings.find(r => String(r.id) === id);
+      if (found) {
+        setSelectedRanking(found);
+        localStorage.setItem("selectedRankingId", String(found.id));
+      }
+    };
+    window.addEventListener("popstate", syncSelection);
+    return () => window.removeEventListener("popstate", syncSelection);
+  }, [rankings]);
+
   const handleSetSelectedRanking = useCallback((ranking: Ranking | null) => {
     setSelectedRanking(ranking);
     if (ranking) {

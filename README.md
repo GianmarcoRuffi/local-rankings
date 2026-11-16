@@ -141,3 +141,11 @@ La lettura del cestino restituisce quattro sezioni paginate (20 elementi, massim
 `generalRankingGroupsPage`, `stagesPage`, `generalRankingUngroupedPage`. La risposta
 aggiunge `pagination`, scadenze e informazioni sulla recuperabilità. Le azioni POST
 restano invariate; gli errori hanno un `code` stabile e stato 400/401/404/409/500.
+
+## Circuiti demo
+
+Eseguire `npm run db:seed-demo` per aggiungere Aurora e Tramonto al database
+configurato: tre tappe e otto giocatori sintetici ciascuno. Due tappe sono già
+conteggiate nella generale, la terza è da inserire. Il comando è transazionale,
+non modifica utenti o circuito predefinito e salta i demo già presenti, anche
+se successivamente modificati o cestinati.

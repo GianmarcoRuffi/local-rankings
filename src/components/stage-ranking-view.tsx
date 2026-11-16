@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { useSession } from "@/hooks/useSession";
 import { useRouter } from "next/navigation";
 import {
@@ -150,6 +150,11 @@ function SortableHead({
 }
 
 export function StageRankingView() {
+  const { selectedRanking } = useRanking();
+  return <StageRankingContent key={selectedRanking?.id ?? "empty"} />;
+}
+
+function StageRankingContent() {
   const router = useRouter();
   const { data: session } = useSession();
   const isAuthenticated = !!session;
@@ -201,8 +206,8 @@ export function StageRankingView() {
       if (res.ok) {
         const data = await res.json();
         setStages(data);
-        if (data.length > 0 && !selectedStage) {
-          setSelectedStage(data[0]);
+        if (!data.some((stage: Stage) => stage.id === selectedStage?.id)) {
+          setSelectedStage(data[0] ?? null);
         }
       }
     } finally {
@@ -210,16 +215,19 @@ export function StageRankingView() {
     }
   }, [selectedRanking, selectedStage]);
 
+  const playersRequest = useRef(0);
   const fetchPlayers = useCallback(async (stageId: number) => {
+    const request = ++playersRequest.current;
+    setPlayers([]);
     setLoadingPlayers(true);
     try {
       const res = await fetch(`/api/ranking/stages/${stageId}`);
       if (res.ok) {
         const data = await res.json();
-        setPlayers(data);
+        if (request === playersRequest.current) setPlayers(data);
       }
     } finally {
-      setLoadingPlayers(false);
+      if (request === playersRequest.current) setLoadingPlayers(false);
     }
   }, []);
 
@@ -483,7 +491,7 @@ export function StageRankingView() {
   });
 
   const currentSelectedStage =
-    stages.find((s) => s.id === selectedStage?.id) ?? selectedStage;
+    stages.find((s) => s.id === selectedStage?.id);
   const isActive = currentSelectedStage?.status === "active";
 
   if (!selectedRanking) {
@@ -555,7 +563,7 @@ export function StageRankingView() {
 
       {currentSelectedStage && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex-1">
               {isAuthenticated && editingStage ? (
                 <div className="flex flex-wrap items-center gap-2">

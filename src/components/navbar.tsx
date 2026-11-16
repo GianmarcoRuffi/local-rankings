@@ -158,7 +158,7 @@ export function Navbar({ user }: NavbarProps) {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300"
+                      className="h-10 w-10 sm:h-10 sm:w-auto sm:px-3 transition-all duration-300"
                       title="Password"
                     >
                       <KeyRound className="h-4 w-4" />
@@ -169,7 +169,7 @@ export function Navbar({ user }: NavbarProps) {
                     variant="destructive"
                     size="icon"
                     onClick={handleLogout}
-                    className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300 font-semibold"
+                    className="h-10 w-10 sm:h-10 sm:w-auto sm:px-3 transition-all duration-300 font-semibold"
                     title="Esci"
                   >
                     <LogOut className="h-4 w-4" />
@@ -181,7 +181,7 @@ export function Navbar({ user }: NavbarProps) {
                   variant="default"
                   size="icon"
                   onClick={handleLogin}
-                  className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 transition-all duration-300"
+                  className="h-10 w-10 sm:h-10 sm:w-auto sm:px-3 transition-all duration-300"
                   title="Accedi"
                 >
                   <LogIn className="h-4 w-4" />
@@ -203,7 +203,7 @@ export function Navbar({ user }: NavbarProps) {
                 </span>
               </div>
             )}
-            <div className="flex gap-1 overflow-x-auto scrollbar-hide flex-1">
+            <div className="flex min-w-0 gap-1 overflow-x-auto scrollbar-hide flex-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive =

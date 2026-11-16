@@ -71,6 +71,21 @@ try {
  const trash=await (await request('/api/ranking/trash?limit=1')).json();assert.ok(trash.stages.length<=1);assert.ok(trash.pagination.stages.totalPages>=1);
  await mkdir('/tmp/local-rankings-screenshots',{recursive:true});
  browser=await chromium.launch({headless:!process.env.DISPLAY});
+ await client.query("INSERT INTO rankings(name) VALUES('Switch Alpha'),('Switch Beta'),('Switch Empty')");
+ const circuits=(await client.query("SELECT id,name FROM rankings WHERE name LIKE 'Switch %'")).rows;
+ const alpha=circuits.find(r=>r.name==='Switch Alpha').id, beta=circuits.find(r=>r.name==='Switch Beta').id, empty=circuits.find(r=>r.name==='Switch Empty').id;
+ for(const [id,label] of [[alpha,'Alpha'],[beta,'Beta']]) await request('/api/ranking/stages',{name:label+' Stage',rankingId:id,players:[{position:1,name:label+' Player',points_awarded:12,t1:0,presenze:1}]});
+ const switchContext=await browser.newContext(); await switchContext.addCookies([{name:'session_token',value:token,url:base}]);
+ const switchPage=await switchContext.newPage(); const switchErrors:string[]=[];switchPage.on('pageerror',e=>switchErrors.push(e.message));
+ await switchPage.goto(base+'/dashboard/stage?rankingId='+alpha);
+ await switchPage.getByText('Alpha Player',{exact:true}).waitFor();
+ const select=async(id:number)=>{await switchPage.getByRole('combobox').click();await switchPage.getByRole('option',{name:circuits.find(r=>r.id===id).name,exact:true}).click();};
+ await select(beta);await switchPage.getByText('Beta Player',{exact:true}).waitFor();assert.equal(await switchPage.getByText('Alpha Player',{exact:true}).count(),0);
+ await select(empty);await switchPage.getByText('Nessuna tappa per questa classifica',{exact:true}).waitFor();assert.equal(await switchPage.getByText('Beta Player',{exact:true}).count(),0);
+ await switchPage.route('**/api/ranking/stages?rankingId='+alpha,async route=>{await new Promise(r=>setTimeout(r,1200));await route.continue();});
+ await select(alpha);await select(beta);await switchPage.getByText('Beta Player',{exact:true}).waitFor();await switchPage.waitForTimeout(1600);assert.equal(await switchPage.getByText('Alpha Player',{exact:true}).count(),0);
+ for(const width of [320,390,768,1440,1600]){await switchPage.setViewportSize({width,height:900});assert.ok(await switchPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'authenticated overflow '+width);await switchPage.screenshot({path:'/tmp/local-rankings-screenshots/switch-'+width+'.png',fullPage:true});}
+ assert.deepEqual(switchErrors,[]);await switchContext.close();console.log('PASS authenticated switching, empty circuit, delayed responses and five responsive widths');
  for(const width of [390,1440]){
   const page: Page=await browser.newPage({viewport:{width,height:900}});const errors:string[]=[]; page.on('pageerror',e=>errors.push(e.message)); page.on('console',m=>{if(m.type()==='error')console.log('browser:',m.text().slice(0,300))}); page.on('response',r=>{if(r.status()>=400 || r.url().includes('/api/rankings'))console.log('HTTP',r.status(),new URL(r.url()).pathname)}); page.on('requestfailed',r=>console.log('requestfailed',new URL(r.url()).pathname,r.failure()?.errorText));
   await page.goto(base+'/dashboard');await page.getByRole('heading',{name:'Classifica Generale',exact:true}).waitFor();

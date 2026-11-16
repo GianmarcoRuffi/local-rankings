@@ -15,7 +15,8 @@
     "db:create-user": "tsx scripts/create-user.ts",
     "db:create-default-ranking": "tsx scripts/create-default-ranking.ts",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:integration": "npm run build && tsx tests/integration.mts"
+    "test:integration": "npm run build && tsx tests/integration.mts",
+    "db:seed-demo": "tsx scripts/seed-demo.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

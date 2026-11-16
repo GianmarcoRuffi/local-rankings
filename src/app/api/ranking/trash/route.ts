@@ -5,380 +5,83 @@ import {
   rankings,
   generalRanking,
   stages,
-  stageRanking,
 } from "@/lib/db/schema";
-import { eq, not, isNull, desc, inArray, and } from "drizzle-orm";
+import { eq, not, isNull, desc, inArray, and, sql, or, gt } from "drizzle-orm";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 
-const restoreRankingSchema = z.object({
-  rankingId: z.number().positive(),
-});
-
-const restoreGeneralEntrySchema = z.object({
-  entryId: z.number().positive(),
-});
-
-const restoreGeneralRankingSchema = z.object({
-  rankingId: z.number().positive(),
-});
-
-const deletePermanentlyRankingSchema = z.object({
-  rankingId: z.number().positive(),
-});
-
-const deletePermanentlyGeneralEntrySchema = z.object({
-  entryId: z.number().positive(),
-});
-
-const deletePermanentlyGeneralRankingSchema = z.object({
-  rankingId: z.number().positive(),
-});
-
-const restoreStageSchema = z.object({
-  stageId: z.number().positive(),
-});
-
-const deletePermanentlyStageSchema = z.object({
-  stageId: z.number().positive(),
-});
-
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized) {
-    return auth.response;
-  }
-
-  try {
-    // Get deleted rankings
-    const deletedRankings = await db
-      .select()
-      .from(rankings)
-      .where(not(isNull(rankings.deletedAt)))
-      .orderBy(desc(rankings.deletedAt));
-
-    // Get deleted general ranking entries grouped by rankingId
-    const deletedGeneralEntries = await db
-      .select()
-      .from(generalRanking)
-      .where(not(isNull(generalRanking.deletedAt)))
-      .orderBy(desc(generalRanking.deletedAt));
-
-    // Group entries by rankingId
-    const generalRankingGroups: Record<number, typeof deletedGeneralEntries> =
-      {};
-    const ungroupedEntries: typeof deletedGeneralEntries = [];
-
-    for (const entry of deletedGeneralEntries) {
-      if (entry.rankingId) {
-        if (!generalRankingGroups[entry.rankingId]) {
-          generalRankingGroups[entry.rankingId] = [];
-        }
-        generalRankingGroups[entry.rankingId].push(entry);
-      } else {
-        ungroupedEntries.push(entry);
-      }
-    }
-
-    // Get ranking names for groups
-    const rankingIds = Object.keys(generalRankingGroups).map(Number);
-    let rankingNames: Record<number, string> = {};
-    if (rankingIds.length > 0) {
-      const rankingData = await db
-        .select({ id: rankings.id, name: rankings.name })
-        .from(rankings)
-        .where(inArray(rankings.id, rankingIds));
-      rankingNames = Object.fromEntries(rankingData.map((r) => [r.id, r.name]));
-    }
-
-    // Create grouped items
-    const generalRankingGroupsWithInfo = Object.entries(
-      generalRankingGroups,
-    ).map(([rankingId, entries]) => ({
-      type: "generalRankingGroup" as const,
-      rankingId: Number(rankingId),
-      rankingName: rankingNames[Number(rankingId)] || `Circuito #${rankingId}`,
-      entryCount: entries.length,
-      deletedAt: entries[0]?.deletedAt,
-      totalPoints: entries.reduce((sum, e) => sum + (e.totalPoints || 0), 0),
-      entries: entries,
-    }));
-
-    // Get deleted stages
-    const deletedStages = await db
-      .select()
-      .from(stages)
-      .where(not(isNull(stages.deletedAt)))
-      .orderBy(desc(stages.deletedAt));
-
-    return NextResponse.json({
-      rankings: deletedRankings,
-      generalRankingGroups: generalRankingGroupsWithInfo,
-      generalRankingUngrouped: ungroupedEntries,
-      stages: deletedStages,
-    });
-  } catch (error) {
-    logger.error("Error fetching trash:", { error });
-    return NextResponse.json(
-      { error: "Failed to fetch trash" },
-      { status: 500 },
-    );
-  }
+ const auth=await requireAuth(request);if(!auth.authorized)return auth.response;
+ const params=request.nextUrl.searchParams;
+ const limit=Number(params.get("limit") || 20);
+ const keys=["rankings","generalRankingGroups","stages","generalRankingUngrouped"] as const;
+ const pages=Object.fromEntries(keys.map(k=>[k,Number(params.get(k+"Page") || 1)]));
+ if(!Number.isInteger(limit)||limit<1||limit>100||Object.values(pages).some(p=>!Number.isInteger(p)||p<1))return NextResponse.json({error:"Paginazione non valida"},{status:400});
+ try {
+  const offset=(k:string)=>(pages[k]-1)*limit;
+  const deletedRankings=await db.select().from(rankings).where(not(isNull(rankings.deletedAt))).orderBy(desc(rankings.deletedAt),desc(rankings.id)).limit(limit).offset(offset("rankings"));
+  const deletedStages=await db.select({id:stages.id,name:stages.name,deletedAt:stages.deletedAt,trashExpiresAt:stages.trashExpiresAt,rankingId:stages.rankingId,parentDeletedAt:rankings.deletedAt}).from(stages).leftJoin(rankings,eq(stages.rankingId,rankings.id)).where(not(isNull(stages.deletedAt))).orderBy(desc(stages.deletedAt),desc(stages.id)).limit(limit).offset(offset("stages"));
+  const groups=await db.select({rankingId:generalRanking.rankingId,rankingName:rankings.name,parentDeletedAt:rankings.deletedAt,entryCount:sql<number>`count(*)::int`,totalPoints:sql<number>`sum(${generalRanking.totalPoints})::int`,deletedAt:sql<string>`max(${generalRanking.deletedAt})`,trashExpiresAt:sql<string>`min(${generalRanking.trashExpiresAt}) FILTER (WHERE ${generalRanking.trashExpiresAt} > NOW())`,restorableCount:sql<number>`count(*) FILTER (WHERE ${generalRanking.trashExpiresAt} IS NULL OR ${generalRanking.trashExpiresAt} > NOW())::int`}).from(generalRanking).leftJoin(rankings,eq(generalRanking.rankingId,rankings.id)).where(and(not(isNull(generalRanking.deletedAt)),not(isNull(generalRanking.rankingId)))).groupBy(generalRanking.rankingId,rankings.name,rankings.deletedAt).orderBy(desc(sql`max(${generalRanking.deletedAt})`),desc(generalRanking.rankingId)).limit(limit).offset(offset("generalRankingGroups"));
+  const ungrouped=await db.select().from(generalRanking).where(and(not(isNull(generalRanking.deletedAt)),isNull(generalRanking.rankingId))).orderBy(desc(generalRanking.deletedAt),desc(generalRanking.id)).limit(limit).offset(offset("generalRankingUngrouped"));
+  const totals=await db.execute(sql`SELECT (SELECT count(*)::int FROM rankings WHERE deleted_at IS NOT NULL) AS rankings,(SELECT count(DISTINCT ranking_id)::int FROM general_ranking WHERE deleted_at IS NOT NULL) AS "generalRankingGroups",(SELECT count(*)::int FROM stages WHERE deleted_at IS NOT NULL) AS stages,(SELECT count(*)::int FROM general_ranking WHERE deleted_at IS NOT NULL AND ranking_id IS NULL) AS "generalRankingUngrouped"`);
+  const pagination=Object.fromEntries(keys.map(k=>[k,{page:pages[k],limit,total:Number(totals.rows[0][k]),totalPages:Math.ceil(Number(totals.rows[0][k])/limit)}]));
+  return NextResponse.json({rankings:deletedRankings,generalRankingGroups:groups,generalRankingUngrouped:ungrouped,stages:deletedStages,pagination});
+ }catch(error){logger.error("Trash read failed",{error});return NextResponse.json({error:"Lettura del cestino non riuscita"},{status:500});}
 }
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth(request);
-  if (!auth.authorized) {
-    return auth.response;
-  }
-
+  if (!auth.authorized) return auth.response;
+  let body;
+  try { body = await request.json(); } catch { return NextResponse.json({error:"JSON non valido",code:"INVALID_PAYLOAD"},{status:400}); }
+  const schema = z.union([
+    ...["restoreRanking", "deletePermanentlyRanking", "restoreGeneralRanking", "deletePermanentlyGeneralRanking"].map(action => z.object({action:z.literal(action),rankingId:z.number().int().positive()})),
+    ...["restoreStage", "deletePermanentlyStage"].map(action => z.object({action:z.literal(action),stageId:z.number().int().positive()})),
+    ...["restoreGeneralEntry", "deletePermanentlyGeneralEntry"].map(action => z.object({action:z.literal(action),entryId:z.number().int().positive()})),
+  ]);
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({error:"Richiesta non valida",code:"INVALID_PAYLOAD"},{status:400});
+  const action = body.action as string;
+  const restoring = action.startsWith("restore");
+  const group = action.endsWith("GeneralRanking");
+  const table = action.endsWith("Ranking") && !group ? rankings : action.endsWith("Stage") ? stages : generalRanking;
+  const id = body.rankingId ?? body.stageId ?? body.entryId;
   try {
-    const body = await request.json();
-    const { action } = body;
-
-    if (action === "restoreRanking") {
-      const parsed = restoreRankingSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    return await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(817241)`);
+      const targets = group
+        ? await tx.select().from(generalRanking).where(and(eq(generalRanking.rankingId,id),not(isNull(generalRanking.deletedAt))))
+        : await tx.select().from(table).where(eq(table.id,id));
+      const fail = (error:string,code:string,status:number) => NextResponse.json({error,code},{status});
+      if (!targets.length) return fail("Elemento non trovato nel cestino","NOT_FOUND",404);
+      if (targets.some(t=>!t.deletedAt)) return fail("L'elemento non è nel cestino","NOT_TRASHED",409);
+      const parentId = table === rankings ? id : group ? id : (targets[0] as typeof stages.$inferSelect).rankingId;
+      const [parent] = parentId ? await tx.select().from(rankings).where(eq(rankings.id,parentId)) : [];
+      if (restoring && table !== rankings && parent?.deletedAt) return NextResponse.json({error:"Ripristina prima il circuito",code:"PARENT_TRASHED",rankingId:parentId},{status:409});
+      const now = new Date();
+      const eligible = targets.filter(t=>!t.trashExpiresAt || t.trashExpiresAt > now);
+      if (restoring && !eligible.length) return fail("Il termine per il ripristino è scaduto","EXPIRED",409);
+      if (table === rankings && !restoring) {
+        const [activeStage] = await tx.select({id:stages.id}).from(stages).where(and(eq(stages.rankingId,id),isNull(stages.deletedAt))).limit(1);
+        const [activeEntry] = await tx.select({id:generalRanking.id}).from(generalRanking).where(and(eq(generalRanking.rankingId,id),isNull(generalRanking.deletedAt))).limit(1);
+        if(activeStage || activeEntry) return fail("Il circuito contiene dati attivi: risolvere l'incoerenza prima di eliminarlo","ACTIVE_CHILDREN",409);
       }
-
-      const { rankingId } = parsed.data;
-
-      // Check if ranking exists in trash
-      const existing = await db
-        .select()
-        .from(rankings)
-        .where(eq(rankings.id, rankingId))
-        .limit(1);
-
-      if (existing.length === 0 || !existing[0].deletedAt) {
-        return NextResponse.json(
-          { error: "Ranking not found in trash" },
-          { status: 404 },
-        );
+      if (!restoring) {
+        await tx.delete(table).where(inArray(table.id,targets.map(t=>t.id)));
+        return NextResponse.json({success:true,message:"Eliminato definitivamente"});
       }
-
-      // Count associated data before restore
-      const associatedGeneral = await db
-        .select()
-        .from(generalRanking)
-        .where(
-          and(
-            eq(generalRanking.rankingId, rankingId),
-            not(isNull(generalRanking.deletedAt)),
-          ),
-        );
-
-      const associatedStages = await db
-        .select()
-        .from(stages)
-        .where(
-          and(eq(stages.rankingId, rankingId), not(isNull(stages.deletedAt))),
-        );
-
-      await db.transaction(async (tx) => {
-        // Restore the ranking
-        await tx
-          .update(rankings)
-          .set({ deletedAt: null, deletionGroup: null })
-          .where(eq(rankings.id, rankingId));
-
-        // Also restore any associated data
-        if (existing[0].deletionGroup) await tx
-          .update(generalRanking)
-          .set({ deletedAt: null, deletionGroup: null })
-          .where(and(eq(generalRanking.rankingId, rankingId), eq(generalRanking.deletionGroup, existing[0].deletionGroup!)));
-
-        if (existing[0].deletionGroup) await tx
-          .update(stages)
-          .set({ deletedAt: null, deletionGroup: null })
-          .where(and(eq(stages.rankingId, rankingId), eq(stages.deletionGroup, existing[0].deletionGroup!)));
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: "Classifica ripristinata",
-        restoredEntries: associatedGeneral.length,
-        restoredStages: associatedStages.length,
-      });
-    }
-
-    if (action === "restoreGeneralEntry") {
-      const parsed = restoreGeneralEntrySchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      const clear = {deletedAt:null,deletionGroup:null,trashExpiresAt:null};
+      await tx.update(table).set(clear).where(inArray(table.id,eligible.map(t=>t.id)));
+      let restoredEntries=0, restoredStages=0;
+      if(table === rankings && targets[0].deletionGroup) {
+        const deletionGroup=targets[0].deletionGroup;
+        restoredEntries=(await tx.update(generalRanking).set(clear).where(and(eq(generalRanking.rankingId,id),eq(generalRanking.deletionGroup,deletionGroup),not(isNull(generalRanking.deletedAt)),or(isNull(generalRanking.trashExpiresAt),gt(generalRanking.trashExpiresAt,now)))).returning({id:generalRanking.id})).length;
+        restoredStages=(await tx.update(stages).set(clear).where(and(eq(stages.rankingId,id),eq(stages.deletionGroup,deletionGroup),not(isNull(stages.deletedAt)),or(isNull(stages.trashExpiresAt),gt(stages.trashExpiresAt,now)))).returning({id:stages.id})).length;
       }
-
-      const { entryId } = parsed.data;
-
-      // Restore the general ranking entry
-      await db
-        .update(generalRanking)
-        .set({ deletedAt: null })
-        .where(eq(generalRanking.id, entryId));
-
-      return NextResponse.json({
-        success: true,
-        message: "Entry ripristinata",
-      });
-    }
-
-    if (action === "restoreGeneralRanking") {
-      const parsed = restoreGeneralRankingSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-      }
-
-      const { rankingId } = parsed.data;
-
-      // Restore all general ranking entries for this ranking
-      await db
-        .update(generalRanking)
-        .set({ deletedAt: null })
-        .where(
-          and(
-            eq(generalRanking.rankingId, rankingId),
-            not(isNull(generalRanking.deletedAt)),
-          ),
-        );
-
-      return NextResponse.json({
-        success: true,
-        message: "Classifica generale ripristinata",
-      });
-    }
-
-    if (action === "deletePermanentlyRanking") {
-      const parsed = deletePermanentlyRankingSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-      }
-
-      const { rankingId } = parsed.data;
-
-      await db.transaction(async (tx) => {
-        // Find stages linked to this ranking to delete their players
-        const rankingStages = await tx
-          .select({ id: stages.id })
-          .from(stages)
-          .where(eq(stages.rankingId, rankingId));
-
-        const stageIds = rankingStages.map((s) => s.id);
-
-        if (stageIds.length > 0) {
-          // Delete players from all stages of this ranking
-          await tx
-            .delete(stageRanking)
-            .where(inArray(stageRanking.stageId, stageIds));
-        }
-
-        // Delete all related stages permanently
-        await tx.delete(stages).where(eq(stages.rankingId, rankingId));
-
-        // Delete all related general ranking data permanently
-        await tx
-          .delete(generalRanking)
-          .where(eq(generalRanking.rankingId, rankingId));
-
-        // Then delete the ranking
-        await tx.delete(rankings).where(eq(rankings.id, rankingId));
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: "Classifica eliminata definitivamente",
-      });
-    }
-
-    if (action === "deletePermanentlyGeneralEntry") {
-      const parsed = deletePermanentlyGeneralEntrySchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-      }
-
-      const { entryId } = parsed.data;
-
-      // Delete permanently
-      await db.delete(generalRanking).where(eq(generalRanking.id, entryId));
-
-      return NextResponse.json({
-        success: true,
-        message: "Entry eliminata definitivamente",
-      });
-    }
-
-    if (action === "deletePermanentlyGeneralRanking") {
-      const parsed = deletePermanentlyGeneralRankingSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-      }
-
-      const { rankingId } = parsed.data;
-
-      // Delete all general ranking entries for this ranking permanently
-      await db
-        .delete(generalRanking)
-        .where(
-          and(
-            eq(generalRanking.rankingId, rankingId),
-            not(isNull(generalRanking.deletedAt)),
-          ),
-        );
-
-      return NextResponse.json({
-        success: true,
-        message: "Classifica generale eliminata definitivamente",
-      });
-    }
-
-    if (action === "restoreStage") {
-      const parsed = restoreStageSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-      }
-
-      const { stageId } = parsed.data;
-
-      // Restore the stage
-      await db
-        .update(stages)
-        .set({ deletedAt: null })
-        .where(eq(stages.id, stageId));
-
-      return NextResponse.json({
-        success: true,
-        message: "Tappa ripristinata",
-      });
-    }
-
-    if (action === "deletePermanentlyStage") {
-      const parsed = deletePermanentlyStageSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-      }
-
-      const { stageId } = parsed.data;
-
-      await db.transaction(async (tx) => {
-        // Delete all players from this stage
-        await tx.delete(stageRanking).where(eq(stageRanking.stageId, stageId));
-
-        // Delete the stage permanently
-        await tx.delete(stages).where(eq(stages.id, stageId));
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: "Tappa eliminata definitivamente",
-      });
-    }
-
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error) {
-    logger.error("Error in trash operation:", { error });
-    return NextResponse.json(
-      { error: "Failed to perform trash operation" },
-      { status: 500 },
-    );
+      return NextResponse.json({success:true,message:"Ripristinato",restoredEntries,restoredStages,restoredCount:eligible.length});
+    });
+  } catch(error) {
+    logger.error("Trash operation failed",{error});
+    return NextResponse.json({error:"Operazione non riuscita",code:"INTERNAL_ERROR"},{status:500});
   }
 }

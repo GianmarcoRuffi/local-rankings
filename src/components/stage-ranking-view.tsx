@@ -858,8 +858,7 @@ export function StageRankingView() {
             <DialogDescription>
               Stai per eliminare la tappa{" "}
               <strong>&quot;{stageToDelete?.name}&quot;</strong>. Questa
-              operazione è <strong>irreversibile</strong>: tutti i dati dei
-              giocatori di questa tappa verranno cancellati definitivamente.
+              operazione sposta la tappa e i risultati nel cestino, recuperabili per cinque giorni.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

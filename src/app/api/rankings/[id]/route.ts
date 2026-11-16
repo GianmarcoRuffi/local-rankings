@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { rankings, generalRanking, stages } from "@/lib/db/schema";
-import { eq, and, ne, isNull } from "drizzle-orm";
+import { sql, eq, and, ne, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { toPositiveInt } from "@/lib/utils";
 
@@ -145,19 +145,25 @@ export async function DELETE(
       );
     }
 
+    if (existing[0].deletedAt) return NextResponse.json({ success: true });
     const deletionGroup = crypto.randomUUID();
+    const deletedAt = new Date();
+    const trashExpiresAt = new Date(deletedAt.getTime()+5*86400000);
     // Perform soft delete on the ranking and its related data in a transaction
     await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(817241)`);
+      const [current] = await tx.select().from(rankings).where(eq(rankings.id,rankingId));
+      if (current?.deletedAt) return;
       // Soft delete the ranking
       await tx
         .update(rankings)
-        .set({ deletedAt: new Date(), deletionGroup })
+        .set({ deletedAt, trashExpiresAt, deletionGroup })
         .where(eq(rankings.id, rankingId));
 
       // Soft delete any associated general ranking data
       await tx
         .update(generalRanking)
-        .set({ deletedAt: new Date(), deletionGroup })
+        .set({ deletedAt, trashExpiresAt, deletionGroup })
         .where(
           and(
             eq(generalRanking.rankingId, rankingId),
@@ -168,7 +174,7 @@ export async function DELETE(
       // Soft delete any associated stages
       await tx
         .update(stages)
-        .set({ deletedAt: new Date(), deletionGroup })
+        .set({ deletedAt, trashExpiresAt, deletionGroup })
         .where(and(eq(stages.rankingId, rankingId), isNull(stages.deletedAt)));
     });
 

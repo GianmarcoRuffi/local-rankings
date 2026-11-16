@@ -29,9 +29,9 @@ export async function GET(request: NextRequest) {
       .from(stages)
       .where(not(isNull(stages.deletedAt)));
 
-    const rankingsCount = deletedRankingsResult[0]?.count || 0;
-    const generalEntriesCount = deletedGeneralEntriesResult[0]?.count || 0;
-    const stagesCount = deletedStagesResult[0]?.count || 0;
+    const rankingsCount = Number(deletedRankingsResult[0]?.count || 0);
+    const generalEntriesCount = Number(deletedGeneralEntriesResult[0]?.count || 0);
+    const stagesCount = Number(deletedStagesResult[0]?.count || 0);
 
     const count = rankingsCount + generalEntriesCount + stagesCount;
 

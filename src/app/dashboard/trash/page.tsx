@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRanking } from "@/hooks/useRanking";
 import { useSession } from "@/hooks/useSession";
 import {
   Trash2,
@@ -28,6 +29,9 @@ interface RankingItem {
   id: number;
   name: string;
   deletedAt: string;
+  trashExpiresAt?: string | null;
+  parentDeletedAt?: string | null;
+  restorableCount?: number;
   type: "ranking";
 }
 
@@ -36,6 +40,9 @@ interface GeneralRankingGroup {
   rankingName: string;
   entryCount: number;
   deletedAt: string;
+  trashExpiresAt?: string | null;
+  parentDeletedAt?: string | null;
+  restorableCount?: number;
   totalPoints: number;
   type: "generalRankingGroup";
 }
@@ -44,17 +51,25 @@ interface StageItem {
   id: number;
   name: string;
   deletedAt: string;
-  type: "stage";
+  trashExpiresAt?: string | null;
+  parentDeletedAt?: string | null;
+  restorableCount?: number;
+  type: "stage" | "generalEntry";
 }
 
 type TrashItem = RankingItem | GeneralRankingGroup | StageItem;
 
 export default function TrashPage() {
-  const { data: session } = useSession();
+  const { refreshRankings } = useRanking();
+  const { data: session, status } = useSession();
   const isAuthenticated = !!session;
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [generalGroups, setGeneralGroups] = useState<GeneralRankingGroup[]>([]);
   const [stages, setStages] = useState<StageItem[]>([]);
+  const fetchSequence = useRef(0);
+  const [pages, setPages] = useState<Record<string,number>>({});
+  const [pagination, setPagination] = useState<Record<string,{page:number;totalPages:number}>>({});
+  const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -67,11 +82,15 @@ export default function TrashPage() {
   >(null);
 
   const fetchTrash = useCallback(async () => {
-    setLoading(true);
+    const sequence=++fetchSequence.current;
+    setLoadError(false);
     try {
-      const res = await fetch("/api/ranking/trash");
+      const res = await fetch("/api/ranking/trash?" + new URLSearchParams(Object.entries(pages).map(([k,v])=>[k+"Page",String(v)])));
+      if (!res.ok) throw new Error("Lettura del cestino non riuscita");
       if (res.ok) {
         const data = await res.json();
+        if(sequence !== fetchSequence.current) return;
+        setPagination(data.pagination || {});
 
         // Transform rankings
         const transformedRankings: RankingItem[] = data.rankings.map(
@@ -79,6 +98,7 @@ export default function TrashPage() {
             id: r.id,
             name: r.name,
             deletedAt: r.deletedAt,
+            trashExpiresAt: (r as unknown as RankingItem).trashExpiresAt,
             type: "ranking" as const,
           }),
         );
@@ -98,7 +118,10 @@ export default function TrashPage() {
               rankingName: g.rankingName,
               entryCount: g.entryCount,
               deletedAt: g.deletedAt,
+              trashExpiresAt: (g as unknown as GeneralRankingGroup).trashExpiresAt,
               totalPoints: g.totalPoints,
+              parentDeletedAt: (g as unknown as GeneralRankingGroup).parentDeletedAt,
+              restorableCount: (g as unknown as GeneralRankingGroup).restorableCount,
               type: "generalRankingGroup" as const,
             }),
           ) || [];
@@ -111,17 +134,21 @@ export default function TrashPage() {
               id: s.id,
               name: s.name,
               deletedAt: s.deletedAt,
+              trashExpiresAt: (s as unknown as StageItem).trashExpiresAt,
+              parentDeletedAt: (s as unknown as StageItem).parentDeletedAt,
               type: "stage" as const,
             }),
           ) || [];
-        setStages(transformedStages);
+        setStages([...transformedStages, ...(data.generalRankingUngrouped || []).map((e: {id:number;name:string;deletedAt:string;trashExpiresAt:string|null}) => ({...e,name:`Voce senza circuito: ${e.name}`,type:"generalEntry" as const}))]);
       }
     } catch (error) {
+      if(sequence !== fetchSequence.current) return;
+      setLoadError(true);
       console.error("Error fetching trash:", error);
     } finally {
-      setLoading(false);
+      if(sequence === fetchSequence.current) setLoading(false);
     }
-  }, []);
+  }, [pages]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -139,9 +166,9 @@ export default function TrashPage() {
     if (!itemToDelete || !confirmAction) return;
 
     if (confirmAction === "restore") {
-      await executeRestore(itemToDelete);
+      if (!await executeRestore(itemToDelete)) return;
     } else {
-      await executeDelete(itemToDelete);
+      if (!await executeDelete(itemToDelete)) return;
     }
 
     setConfirmDialogOpen(false);
@@ -173,13 +200,13 @@ export default function TrashPage() {
             rankingId: item.rankingId,
           }),
         });
-      } else if (item.type === "stage") {
+      } else if (item.type === "stage" || item.type === "generalEntry") {
         res = await fetch("/api/ranking/trash", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: "restoreStage",
-            stageId: item.id,
+            action: item.type === "generalEntry" ? "restoreGeneralEntry" : "restoreStage",
+            ...(item.type === "generalEntry" ? {entryId:item.id} : {stageId:item.id}),
           }),
         });
       }
@@ -190,7 +217,10 @@ export default function TrashPage() {
           description: getItemName(item) + " è stato ripristinato.",
           variant: "success" as Parameters<typeof toast>[0]["variant"],
         });
-        await fetchTrash();
+        setConfirmDialogOpen(false);
+        void fetchTrash();
+        void refreshRankings();
+        return true;
       } else {
         const data = await res?.json();
         toast({
@@ -199,6 +229,9 @@ export default function TrashPage() {
           variant: "destructive",
         });
       }
+    } catch {
+      toast({title:"Errore",description:"Connessione interrotta. Aggiorna il cestino prima di riprovare.",variant:"destructive"});
+      void fetchTrash();
     } finally {
       setRestoring(null);
     }
@@ -228,13 +261,13 @@ export default function TrashPage() {
             rankingId: item.rankingId,
           }),
         });
-      } else if (item.type === "stage") {
+      } else if (item.type === "stage" || item.type === "generalEntry") {
         res = await fetch("/api/ranking/trash", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: "deletePermanentlyStage",
-            stageId: item.id,
+            action: item.type === "generalEntry" ? "deletePermanentlyGeneralEntry" : "deletePermanentlyStage",
+            ...(item.type === "generalEntry" ? {entryId:item.id} : {stageId:item.id}),
           }),
         });
       }
@@ -246,7 +279,10 @@ export default function TrashPage() {
             getItemName(item) + " è stato eliminato definitivamente.",
           variant: "success" as Parameters<typeof toast>[0]["variant"],
         });
-        await fetchTrash();
+        setConfirmDialogOpen(false);
+        void fetchTrash();
+        void refreshRankings();
+        return true;
       } else {
         const data = await res?.json();
         toast({
@@ -256,6 +292,9 @@ export default function TrashPage() {
           variant: "destructive",
         });
       }
+    } catch {
+      toast({title:"Errore",description:"Connessione interrotta. Aggiorna il cestino prima di riprovare.",variant:"destructive"});
+      void fetchTrash();
     } finally {
       setDeleting(null);
     }
@@ -277,6 +316,8 @@ export default function TrashPage() {
       minute: "2-digit",
     });
   };
+
+  if (status === "loading") return <div role="status" className="min-h-[60vh]">Caricamento sessione...</div>;
 
   if (!isAuthenticated) {
     return (
@@ -306,6 +347,7 @@ export default function TrashPage() {
         </p>
       </div>
 
+      {loadError && <div role="alert">Impossibile aggiornare il cestino. <Button onClick={() => void fetchTrash()}>Riprova</Button></div>}
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="text-muted-foreground flex items-center gap-2">
@@ -313,7 +355,7 @@ export default function TrashPage() {
             Caricamento...
           </div>
         </div>
-      ) : !hasItems ? (
+      ) : !hasItems && !loadError ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <Trash2 className="h-16 w-16 text-muted-foreground/30 mb-4" />
@@ -343,14 +385,14 @@ export default function TrashPage() {
                   {rankings.map((item) => (
                     <div
                       key={`ranking-${item.id}`}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <Trophy className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="font-medium">{item.name}</p>
+                          <p className="font-medium break-words [overflow-wrap:anywhere]">{item.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Eliminato il {formatDate(item.deletedAt)}
+                            Eliminato il {formatDate(item.deletedAt)}{item.trashExpiresAt && <> · {new Date(item.trashExpiresAt) <= new Date() ? "Scaduto, in attesa di eliminazione" : `Recuperabile fino al ${formatDate(item.trashExpiresAt)}`}</>}
                           </p>
                         </div>
                       </div>
@@ -359,8 +401,8 @@ export default function TrashPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => openConfirmDialog(item, "restore")}
-                          disabled={restoring === item.id}
-                          title="Ripristina"
+                          disabled={!!item.parentDeletedAt || item.restorableCount === 0 || restoring !== null || deleting !== null || !!(item.trashExpiresAt && new Date(item.trashExpiresAt) <= new Date())}
+                          title={item.parentDeletedAt ? "Ripristina prima il circuito" : "Ripristina"}
                         >
                           <RotateCcw className="h-4 w-4 mr-1" />
                           {restoring === item.id
@@ -401,21 +443,21 @@ export default function TrashPage() {
                   {generalGroups.map((item) => (
                     <div
                       key={`group-${item.rankingId}`}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
                           <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                          <p className="font-medium">{item.rankingName}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <p className="font-medium break-words [overflow-wrap:anywhere]">{item.rankingName}</p>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span>{item.entryCount} giocatori</span>
                             <span>•</span>
                             <span>{item.totalPoints} punti totali</span>
                             <span>•</span>
                             <span>
-                              Eliminato il {formatDate(item.deletedAt)}
+                              Eliminato il {formatDate(item.deletedAt)}{item.trashExpiresAt && <> · {new Date(item.trashExpiresAt) <= new Date() ? "Scaduto, in attesa di eliminazione" : `Recuperabile fino al ${formatDate(item.trashExpiresAt)}`}</>}
                             </span>
                           </div>
                         </div>
@@ -425,7 +467,7 @@ export default function TrashPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => openConfirmDialog(item, "restore")}
-                          disabled={restoring === item.rankingId}
+                          disabled={!!item.parentDeletedAt || item.restorableCount === 0 || restoring !== null || deleting !== null || !!(item.trashExpiresAt && new Date(item.trashExpiresAt) <= new Date())}
                           title="Ripristina tutta la classifica"
                         >
                           <RotateCcw className="h-4 w-4 mr-1" />
@@ -467,14 +509,14 @@ export default function TrashPage() {
                   {stages.map((item) => (
                     <div
                       key={`stage-${item.id}`}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <Trophy className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="font-medium">{item.name}</p>
+                          <p className="font-medium break-words [overflow-wrap:anywhere]">{item.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Eliminato il {formatDate(item.deletedAt)}
+                            Eliminato il {formatDate(item.deletedAt)}{item.trashExpiresAt && <> · {new Date(item.trashExpiresAt) <= new Date() ? "Scaduto, in attesa di eliminazione" : `Recuperabile fino al ${formatDate(item.trashExpiresAt)}`}</>}
                           </p>
                         </div>
                       </div>
@@ -483,8 +525,8 @@ export default function TrashPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => openConfirmDialog(item, "restore")}
-                          disabled={restoring === item.id}
-                          title="Ripristina"
+                          disabled={!!item.parentDeletedAt || item.restorableCount === 0 || restoring !== null || deleting !== null || !!(item.trashExpiresAt && new Date(item.trashExpiresAt) <= new Date())}
+                          title={item.parentDeletedAt ? "Ripristina prima il circuito" : "Ripristina"}
                         >
                           <RotateCcw className="h-4 w-4 mr-1" />
                           {restoring === item.id
@@ -510,8 +552,9 @@ export default function TrashPage() {
         </div>
       )}
 
+      <div className="flex flex-wrap gap-4">{Object.entries(pagination).filter(([,p])=>p.totalPages>1).map(([key,p])=><div key={key} className="flex items-center gap-2"><span>{({rankings:"Circuiti",generalRankingGroups:"Dati generali",stages:"Tappe",generalRankingUngrouped:"Voci senza circuito"} as Record<string,string>)[key]}: {p.page}/{p.totalPages}</span><Button disabled={p.page<=1} onClick={()=>setPages(old=>({...old,[key]:p.page-1}))}>Precedente</Button><Button disabled={p.page>=p.totalPages} onClick={()=>setPages(old=>({...old,[key]:p.page+1}))}>Successiva</Button></div>)}</div>
       {/* Dialog di conferma */}
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+      <Dialog open={confirmDialogOpen} onOpenChange={(open) => { if (restoring === null && deleting === null) setConfirmDialogOpen(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
@@ -560,7 +603,7 @@ export default function TrashPage() {
                       {" "}
                       Verranno ripristinati{" "}
                       <strong>
-                        {(itemToDelete as GeneralRankingGroup).entryCount}{" "}
+                        {confirmAction === "restore" ? (itemToDelete as GeneralRankingGroup).restorableCount ?? (itemToDelete as GeneralRankingGroup).entryCount : (itemToDelete as GeneralRankingGroup).entryCount}{" "}
                         giocatori
                       </strong>
                       .

@@ -453,9 +453,7 @@ export function RankingSelector({
             <DialogDescription>
               Stai per eliminare la classifica{" "}
               <strong>&quot;{rankingToDelete?.name}&quot;</strong>. Questa
-              operazione è <strong>irreversibile</strong>: tutti i dati della
-              classifica generale verranno eliminati. Le tappe associate
-              verranno scollegate ma non eliminate.
+              operazione sposta nel cestino il circuito, la classifica generale e le tappe associate, recuperabili per cinque giorni.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

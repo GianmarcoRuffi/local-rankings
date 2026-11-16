@@ -22,7 +22,7 @@ try {
  await client.query("INSERT INTO sessions(user_id,token,expires_at) VALUES(1,'test-session',NOW()+INTERVAL '20 minutes')");
  await client.query("INSERT INTO rankings(name,is_default) VALUES('Test ranking',true)");
  const token = await new SignJWT({userId:1,username:'test',displayName:'Test'}).setJti('test-session').setProtectedHeader({alg:'HS256'}).setIssuedAt().setExpirationTime('20m').sign(new TextEncoder().encode(secret));
- app=spawn('node',['node_modules/next/dist/bin/next','start','-p','3181'],{env:{...process.env,NODE_ENV:'production',DATABASE_URL:'postgresql://postgres:test-only@127.0.0.1:55439/postgres?sslmode=disable',POSTGRES_URL:'postgresql://postgres:test-only@127.0.0.1:55439/postgres?sslmode=disable',JWT_SECRET:secret,NEXTAUTH_SECRET:secret,TURNSTILE_SECRET_KEY:'1x0000000000000000000000000000000AA',NEXT_PUBLIC_TURNSTILE_SITE_KEY:'1x00000000000000000000AA'},stdio:'ignore'});
+ app=spawn('node',['node_modules/next/dist/bin/next','start','-p','3181'],{env:{...process.env,NODE_ENV:'production',CRON_SECRET:'isolated-cron',TRASH_CLEANUP_ENABLED:'true',VERCEL_ENV:'production',DATABASE_URL:'postgresql://postgres:test-only@127.0.0.1:55439/postgres?sslmode=disable',POSTGRES_URL:'postgresql://postgres:test-only@127.0.0.1:55439/postgres?sslmode=disable',JWT_SECRET:secret,NEXTAUTH_SECRET:secret,TURNSTILE_SECRET_KEY:'1x0000000000000000000000000000000AA',NEXT_PUBLIC_TURNSTILE_SITE_KEY:'1x00000000000000000000AA'},stdio:'ignore'});
  let ready=false;
  for(let i=0;i<120;i++){try { if((await fetch(base+'/api/rankings',{signal:AbortSignal.timeout(2000)})).ok){ready=true;break;} }catch{} await new Promise(r=>setTimeout(r,500));}
  assert.ok(ready,'isolated application starts');
@@ -42,6 +42,33 @@ try {
  assert.equal((await request('/api/ranking/trash',{action:'restoreRanking',rankingId:2})).status,200);
  const restored=await client.query('SELECT name,deleted_at FROM stages WHERE ranking_id=2 ORDER BY id');
  assert.ok(restored.rows[0].deleted_at);assert.equal(restored.rows[1].deleted_at,null);
+ // Trash regressions use only the isolated database.
+ assert.equal((await request('/api/ranking/trash',{action:'restoreStage',stageId:1.5})).status,400);
+ assert.equal((await request('/api/ranking/trash',{action:'restoreStage',stageId:999999})).status,404);
+ assert.equal((await request('/api/ranking/trash',{action:'deletePermanentlyRanking',rankingId:1})).status,409);
+ const trashCount=await (await request('/api/ranking/trash/count')).json();
+ assert.equal(typeof trashCount.count,'number');
+ assert.equal(trashCount.count,trashCount.rankings+trashCount.generalEntries+trashCount.stages);
+ await client.query("INSERT INTO rankings(name) VALUES('Repeated deletion')");
+ await client.query("INSERT INTO stages(name,ranking_id) VALUES('Repeated child',3)");
+ for(let i=0;i<2;i++) assert.equal((await fetch(base+'/api/rankings/3',{method:'DELETE',headers:{Cookie:`session_token=${token}`}})).status,200);
+ const repeatedGroup=await client.query('SELECT deletion_group,trash_expires_at FROM rankings WHERE id=3');assert.ok(repeatedGroup.rows[0].trash_expires_at);
+ assert.equal((await request('/api/ranking/trash',{action:'restoreStage',stageId:4})).status,409);
+ assert.equal((await request('/api/ranking/trash',{action:'restoreRanking',rankingId:3})).status,200);
+ assert.equal((await client.query('SELECT deleted_at FROM stages WHERE ranking_id=3')).rows[0].deleted_at,null);
+ await client.query("INSERT INTO stages(name,ranking_id,deleted_at,trash_expires_at) VALUES('Expired',1,NOW()-INTERVAL '6 days',NOW()-INTERVAL '1 day')");
+ const expired=(await client.query("SELECT id FROM stages WHERE name='Expired'")).rows[0].id;
+ assert.equal((await request('/api/ranking/trash',{action:'restoreStage',stageId:expired})).status,409);
+ assert.equal((await fetch(base+'/api/cron/trash')).status,401);
+ const cronHeaders={Authorization:'Bearer isolated-cron'};
+ assert.equal((await fetch(base+'/api/cron/trash?dryRun=true',{headers:cronHeaders})).status,200);
+ assert.equal((await client.query('SELECT id FROM stages WHERE id=$1',[expired])).rowCount,1);
+ assert.equal((await fetch(base+'/api/cron/trash',{headers:cronHeaders})).status,200);
+ assert.equal((await client.query('SELECT id FROM stages WHERE id=$1',[expired])).rowCount,0);
+ assert.equal((await fetch(base+'/api/cron/trash',{headers:cronHeaders})).status,200);
+ assert.equal((await client.query('SELECT id FROM rankings WHERE id=1')).rowCount,1);
+
+ const trash=await (await request('/api/ranking/trash?limit=1')).json();assert.ok(trash.stages.length<=1);assert.ok(trash.pagination.stages.totalPages>=1);
  await mkdir('/tmp/local-rankings-screenshots',{recursive:true});
  browser=await chromium.launch({headless:!process.env.DISPLAY});
  for(const width of [390,1440]){
@@ -60,6 +87,34 @@ try {
   }
   await page.close();
  }
+ // Browser regressions for trash interaction, network errors and layout.
+ const trashContext=await browser.newContext();
+ await trashContext.addCookies([{name:'session_token',value:token,url:base}]);
+ const trashPage=await trashContext.newPage();const trashErrors:string[]=[];
+ trashPage.on('pageerror',e=>trashErrors.push(e.message));
+ await trashPage.goto(base+'/dashboard/trash');
+ await trashPage.getByText('Old deletion',{exact:true}).waitFor();
+ assert.equal(await trashPage.locator('a[href="/dashboard/trash"]').count()>0,true);
+ for(const width of [320,390,768,1440]) {
+  await trashPage.setViewportSize({width,height:900});
+  assert.ok(await trashPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ }
+ const oldRow=trashPage.getByText('Old deletion',{exact:true}).locator('../../..');
+ await oldRow.getByRole('button',{name:'Ripristina',exact:true}).click();
+ await trashPage.getByRole('button',{name:'Annulla',exact:true}).click();
+ assert.ok((await client.query('SELECT deleted_at FROM stages WHERE id=2')).rows[0].deleted_at);
+ await trashPage.route('**/api/ranking/trash*',async route=>route.request().method()==='POST'?route.abort('failed'):route.continue());
+ await oldRow.getByRole('button',{name:'Ripristina',exact:true}).click();
+ await trashPage.getByRole('button',{name:'Sì, ripristina',exact:true}).click();
+ await trashPage.getByText('Connessione interrotta. Aggiorna il cestino prima di riprovare.',{exact:true}).waitFor();
+ assert.deepEqual(trashErrors,[]);
+ await trashPage.unroute('**/api/ranking/trash*');
+ await trashPage.getByRole('dialog').getByRole('button',{name:'Annulla',exact:true}).click();
+ await oldRow.getByRole('button',{name:'Ripristina',exact:true}).click();
+ await trashPage.getByRole('button',{name:'Sì, ripristina',exact:true}).click();
+ await trashPage.getByRole('dialog').waitFor({state:'hidden'});
+ assert.equal((await client.query('SELECT deleted_at FROM stages WHERE id=2')).rows[0].deleted_at,null);
+ await trashContext.close();
  assert.equal((await request('/api/auth/logout',{})).status,200);
  assert.equal((await request('/api/ranking/stages',{name:'Revoked',rankingId:1})).status,401);
  console.log('PASS: migrations, validation, authorization, concurrent merge, trash filter, logout revocation, desktop/mobile rendering');

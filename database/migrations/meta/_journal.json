@@ -36,6 +36,13 @@
       "when": 1794769407492,
       "tag": "0004_deletion_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794826025958,
+      "tag": "0005_trash_expiration",
+      "breakpoints": true
     }
   ]
 }

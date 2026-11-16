@@ -44,6 +44,7 @@ export const rankings = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
     deletedAt: timestamp("deleted_at"),
+    trashExpiresAt: timestamp("trash_expires_at", { withTimezone: true }),
     deletionGroup: varchar("deletion_group", { length: 36 }),
   },
   (table) => [
@@ -72,6 +73,7 @@ export const stages = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
     deletedAt: timestamp("deleted_at"),
+    trashExpiresAt: timestamp("trash_expires_at", { withTimezone: true }),
     deletionGroup: varchar("deletion_group", { length: 36 }),
   },
   (table) => [
@@ -123,6 +125,7 @@ export const generalRanking = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
     deletedAt: timestamp("deleted_at"),
+    trashExpiresAt: timestamp("trash_expires_at", { withTimezone: true }),
     deletionGroup: varchar("deletion_group", { length: 36 }),
   },
   (table) => [

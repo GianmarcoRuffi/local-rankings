@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/lib/db";
 import { stages, stageRanking } from "@/lib/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { sql, eq, and, isNull } from "drizzle-orm";
 import { toPositiveInt } from "@/lib/utils";
 
 export async function PUT(
@@ -47,7 +47,9 @@ export async function PUT(
       );
     }
 
-    await db
+    await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(817241)`);
+        await tx
       .update(stages)
       .set({
         name,
@@ -56,6 +58,7 @@ export async function PUT(
         updatedAt: new Date(),
       })
       .where(eq(stages.id, stageId));
+      });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -129,10 +132,13 @@ export async function DELETE(
     }
 
     // Soft delete the stage
-    await db
+    await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(817241)`);
+        await tx
       .update(stages)
-      .set({ deletedAt: new Date() })
+      .set({ deletedAt: new Date(), trashExpiresAt: new Date(Date.now()+5*86400000) })
       .where(eq(stages.id, stageId));
+      });
 
     return NextResponse.json({
       success: true,

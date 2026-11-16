@@ -37,6 +37,7 @@ const publicNavItems = [
 ];
 
 const privateNavItems = [
+  { href: "/dashboard/trash", label: "Cestino", icon: Trophy },
   {
     href: "/dashboard/upload",
     label: "Aggiungi tappe",
@@ -86,14 +87,14 @@ export function Navbar({ user }: NavbarProps) {
         {/* Main Header Row: Logo, Ranking Selector, User Actions */}
         <div
           className={cn(
-            "flex items-center justify-between gap-2 transition-all duration-300",
-            isScrolled ? "h-14" : "h-16",
+            "flex flex-wrap items-center justify-between gap-2 py-2 transition-all duration-300",
+            isScrolled ? "min-h-14" : "min-h-16",
           )}
         >
           {/* Logo Section */}
           <Link
             href="/dashboard"
-            className="flex items-center gap-1 sm:gap-2 shrink-0"
+            className="flex flex-wrap max-w-full items-center gap-1 sm:gap-2"
           >
             <Trophy
               className={cn(
@@ -112,7 +113,7 @@ export function Navbar({ user }: NavbarProps) {
           </Link>
 
           {/* Nav Items (Desktop only) */}
-          <div className="hidden lg:flex items-center gap-1 mx-4">
+          <div className="hidden min-[1500px]:flex items-center gap-1 mx-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive =
@@ -140,7 +141,7 @@ export function Navbar({ user }: NavbarProps) {
           {/* Right Section: Selector + User Actions */}
           <div
             className={cn(
-              "flex items-center gap-1 sm:gap-2 shrink-0",
+              "flex flex-wrap max-w-full items-center gap-1 sm:gap-2",
               !user && "flex-1 justify-end",
             )}
           >
@@ -192,7 +193,7 @@ export function Navbar({ user }: NavbarProps) {
         </div>
 
         {/* Navigation Tabs Row (Mobile/Tablet only) */}
-        <div className="lg:hidden border-t py-2">
+        <div className="min-[1500px]:hidden border-t py-2">
           <div className="flex items-center gap-4">
             {user && (
               <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground shrink-0 border-r pr-3">

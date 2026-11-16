@@ -27,9 +27,11 @@ export async function POST(request: NextRequest) {
 
     if (rankingId) {
       // Soft delete only the specified ranking (move to trash)
-      await db
+      await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(817241)`);
+        await tx
         .update(generalRanking)
-        .set({ deletedAt: new Date() })
+        .set({ deletedAt: new Date(), trashExpiresAt: new Date(Date.now()+5*86400000) })
         .where(
           and(
             or(
@@ -42,6 +44,7 @@ export async function POST(request: NextRequest) {
             isNull(generalRanking.deletedAt),
           ),
         );
+      });
       invalidateCache(`general-ranking:${rankingId}`);
       return NextResponse.json({
         success: true,
@@ -49,10 +52,13 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Soft delete all rankings (move to trash)
-      await db
+      await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(817241)`);
+        await tx
         .update(generalRanking)
-        .set({ deletedAt: new Date() })
+        .set({ deletedAt: new Date(), trashExpiresAt: new Date(Date.now()+5*86400000) })
         .where(isNull(generalRanking.deletedAt));
+      });
       invalidateCache("general-ranking:");
       return NextResponse.json({
         success: true,

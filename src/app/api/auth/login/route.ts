@@ -36,16 +36,24 @@ async function verifyTurnstileToken(
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body,
+        signal: AbortSignal.timeout(10_000),
       },
     );
 
     if (!response.ok) {
+      logger.warn("Turnstile verification HTTP error", { status: response.status });
       return false;
     }
 
     const result = await response.json();
+    if (result?.success !== true) {
+      logger.warn("Turnstile verification rejected", {
+        errorCodes: result?.["error-codes"],
+      });
+    }
     return result?.success === true;
   } catch {
+    logger.warn("Turnstile verification unavailable");
     return false;
   }
 }

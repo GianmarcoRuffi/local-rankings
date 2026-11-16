@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { Trophy } from "lucide-react";
 import {
@@ -16,9 +16,16 @@ import { Label } from "@/components/ui/label";
 
 declare global {
   interface Window {
-    onTurnstileSuccess?: (token: string) => void;
     turnstile?: {
-      reset: () => void;
+      render: (container: HTMLElement, options: {
+        sitekey: string;
+        callback: (token: string) => void;
+        "expired-callback": () => void;
+        "error-callback": (code: string) => void;
+        "timeout-callback": () => void;
+      }) => string;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
     };
     __NEXT_PUBLIC_TURNSTILE_SITE_KEY__?: string;
   }
@@ -31,12 +38,53 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const captchaContainer = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<string | null>(null);
+  const [scriptReady, setScriptReady] = useState(false);
+  const [captchaError, setCaptchaError] = useState("");
   const turnstileSiteKey =
     typeof window === "undefined"
       ? process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
       : window.__NEXT_PUBLIC_TURNSTILE_SITE_KEY__ ||
         process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const isTurnstileConfigured = Boolean(turnstileSiteKey);
+
+  const resetCaptcha = useCallback(() => {
+    setCaptchaToken("");
+    if (widgetId.current !== null) {
+      window.turnstile?.reset(widgetId.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!scriptReady || !captchaContainer.current || !window.turnstile || !turnstileSiteKey) return;
+
+    const turnstile = window.turnstile;
+    const id = turnstile.render(captchaContainer.current, {
+      sitekey: turnstileSiteKey,
+      callback: (token) => {
+        setCaptchaToken(token);
+        setCaptchaError("");
+      },
+      "expired-callback": () => {
+        setCaptchaError("Verifica scaduta. Completa nuovamente la verifica anti-bot.");
+        resetCaptcha();
+      },
+      "timeout-callback": () => {
+        setCaptchaError("Tempo di verifica scaduto. Riprova.");
+        resetCaptcha();
+      },
+      "error-callback": (code) => {
+        setCaptchaToken("");
+        setCaptchaError(`Verifica Cloudflare non riuscita (codice ${code}). Riprova.`);
+      },
+    });
+    widgetId.current = id;
+    return () => {
+      turnstile.remove(id);
+      widgetId.current = null;
+    };
+  }, [scriptReady, turnstileSiteKey, resetCaptcha]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,8 +120,7 @@ export default function LoginPage() {
 
       if (!response.ok) {
         setError(data.error || "Errore durante il login");
-        setCaptchaToken("");
-        window.turnstile?.reset();
+        resetCaptcha();
       } else {
         setRedirecting(true);
         // Forza reload completo per assicurare che il cookie venga letto
@@ -84,6 +131,7 @@ export default function LoginPage() {
       }
     } catch {
       setError("Errore di connessione");
+      resetCaptcha();
     } finally {
       setLoading(false);
     }
@@ -93,13 +141,10 @@ export default function LoginPage() {
     <>
       {isTurnstileConfigured && (
         <Script
-          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
           strategy="afterInteractive"
-          onLoad={() => {
-            window.onTurnstileSuccess = (token: string) => {
-              setCaptchaToken(token);
-            };
-          }}
+          onReady={() => setScriptReady(true)}
+          onError={() => setCaptchaError("Impossibile caricare la verifica Cloudflare. Controlla la connessione e ricarica la pagina.")}
         />
       )}
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
@@ -142,14 +187,20 @@ export default function LoginPage() {
                 />
               </div>
               {isTurnstileConfigured ? (
-                <div
-                  className="cf-turnstile"
-                  data-sitekey={turnstileSiteKey}
-                  data-callback="onTurnstileSuccess"
-                />
+                <div ref={captchaContainer} />
               ) : (
                 <div className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
                   Captcha obbligatorio non configurato.
+                </div>
+              )}
+              {captchaError && (
+                <div role="alert" className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
+                  {captchaError}
+                  {scriptReady && (
+                    <Button type="button" variant="outline" className="mt-2" onClick={resetCaptcha}>
+                      Riprova la verifica
+                    </Button>
+                  )}
                 </div>
               )}
               {error && (
@@ -160,7 +211,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || redirecting || !isTurnstileConfigured}
+                disabled={loading || redirecting || !isTurnstileConfigured || !captchaToken}
               >
                 {loading || redirecting ? "Accesso in corso..." : "Accedi"}
               </Button>
